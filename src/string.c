@@ -24,9 +24,6 @@
 # include "../../config.h"
 #endif
 
-#define TRUE 1
-#define FALSE 0
-
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
