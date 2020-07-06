@@ -1,0 +1,458 @@
+vpp / VHDL PreProcessor 日本語 README
+Copyright (c) 2006-2009 Takashige Sugie <takashige@users.sourceforge.net>, All rights reserved.
+
+
+
+
+1. はじめに
+===========
+
+vppはVHDLのソースファイルをvppが認識できるプリプロセッサシンボルに従って該当するコード変換を行い，別名のファイルへ出力するコマンドラインのプログラムです．
+Cプリプロセッサの簡易版のような機能を提供します．
+複数行のコメントアウトや条件による有効コードの選択などが可能です．
+独自機能として特定範囲のコードの繰り返し出力やランダムな数値の生成なども行えます．
+
+
+
+
+2. インストール / アンインストール
+==================================
+
+2.1 インストール
+~~~~~~~~~~~~~~~~
+http://sourceforge.net/projects/vhdlpp/ から最新のソースファイルをダウンロードします．
+ダウンロードしたファイルを展開します．
+
+% tar Jxvf vpp-x.y.z.tar.xz
+
+展開して作成されたディレクトリに移動して，コンフィギャを実行します．
+
+% cd vpp-x.y.z
+% ./configure
+
+コンパイルしてインストールします．
+
+% make
+% make install
+
+正常に終了していれば vpp という実行ファイルがインストールされています．
+
+2.2 アンインストール
+~~~~~~~~~~~~~~~~~~~~
+実行ファイルを削除すれば完了です．
+
+
+
+
+3. 使い方
+=========
+
+% vpp [オプション] 処理前のファイル名 処理後のファイル名
+
+「処理前のファイル名」のファイルを読み込んで，処理結果を「処理後のファイル名」のファイルへ書き出します．
+
+オプション一覧
+~~~~~~~~~~~~~~
+-D, --define=<label>	コマンドライン上から条件付コメントアウトのラベルを定義します．(4.3を参照)
+-C, --comment=<char>	コメントアウトのキャラクタを定義します．デフォルトは'-'です．
+-s, --silent		スタンダードアウトへの出力を行いません．
+-v, --version		vppバージョンをスタンダードアウトへ出力します．
+-h, --help		ヘルプをスタンダードアウトへ出力します．
+
+
+
+
+4. プリプロセッサシンボル
+=========================
+
+4.1 コメントアウト /* */
+~~~~~~~~~~~~~~~~~~
+複数行に跨がるコメントアウトを行うには開始記号に /* 終了記号に */ を用います．
+これは最も優先度が高く，以下で紹介するシャープ記号を用いたプリプロセッサシンボルもコメントアウトの対象になります．
+
+例)
+[original source file]					[converted source file]
+-------------------------------------------------------------------------------
+/*							--
+a <= b + c;						--a <= b + c;
+d <= e - f;						--d <= e - f;
+*/							--*/
+a <= b - c;						a <= b - c;
+d <= e + f;						d <= e + f;
+
+g <= a + d;						g <= a + d;
+
+
+4.2 ファイルの取込 #include "ファイル名"
+~~~~~~~~~~~~~~~~~~
+#include 以下のブレースで囲まれた文字列をファイル名として，そのファイル内容をそこへ展開します．
+
+例)
+"clk bench.vhd"というファイル名の中身
+-------------------------------------------------------------------------------
+process begin
+	PCI_Clk <= transport '1';
+	wait for PciClkT / 2;
+	PCI_Clk <= transport '0';
+	wait for PciClkT / 2;
+end process;
+
+[original source file]					[converted source file]
+-------------------------------------------------------------------------------
+#include "clk bench.vhd"				--#include "clk bench.vhd"
+							process begin
+process begin							PCI_Clk <= transport '1';
+	wait;							wait for PciClkT / 2;
+end process;							PCI_Clk <= transport '0';
+								wait for PciClkT / 2;
+							end process;
+
+							process begin
+								wait;
+							end process;
+
+
+4.3 ラベルの定義 #define LABEL
+~~~~~~~~~~~~~~~~
+#define 以下の文字列を #ifdef と #ifndef と #elif で評価されるラベルとして定義します．
+ラベル名は1単語でなければなりません．
+
+例) 4.7 条件付コメントアウトを参照
+
+
+4.4 文字列置換 #define LABEL "STRING"
+~~~~~~~~~~~~~~
+#define 以下の初めの1単語をそれ以降のダブルクォーテーションで囲まれた文字列に置き換えます．
+
+例)
+[original source file]					[converted source file]
+-------------------------------------------------------------------------------
+#define cbe_t "std_logic_vector(3 downto 0)"		--#define cbe_t "std_logic_vector(3 downto 0)"
+
+signal pci_cbe:		cbe_t;				signal pci_cbe:		std_logic_vector(3 downto 0);
+
+
+4.5 ランダム文字列の生成 #rand LABEL FORMAT
+~~~~~~~~~~~~~~~~~~~~~~~~
+#rand 以下の初めの1単語をそれ以降のフォーマットに従って生成したランダム文字列に置き換えます．
+フォーマットは底を表す1文字のアルファベットと生成する桁数を表記します．
+底は以下の種類を扱えます．
+B, b	: 2進数
+D, d	: 10進数
+H, h	: 16進数
+
+例)
+[original source file]					[converted source file]
+-------------------------------------------------------------------------------
+#rand aaa B1						--#rand aaa B1
+#rand bbb b5						--#rand bbb b5
+#rand ccc D6						--#rand ccc D6
+#rand ddd h8						--#rand ddd h8
+
+e <= aaa;						e <= '1';
+f <= bbb;						f <= "10110";
+g <= ccc;						g <= 309274;
+h <= ddd;						h <= X"a5cb907d";
+
+
+4.6 定義済のラベルの削除 #undef LABEL
+~~~~~~~~~~~~~~~~~~~~~~~~
+#define と #rand によって定義されているラベル名に該当するものがあればそれを削除します．
+
+例)
+[original source file]					[converted source file]
+-------------------------------------------------------------------------------
+#rand aaa B1						--#rand aaa B1
+
+e <= aaa;						e <= '0';
+
+#undef aaa						--#undef aaa
+
+f <= aaa;						f <= aaa;
+
+
+4.7 条件付コメントアウト #ifdef LABEL , #ifndef LABEL , #elif , #else , #endif
+~~~~~~~~~~~~~~~~~~~~~~~~
+#define によって定義されたラベルを検索して該当するものがあれば #else または #endif が出現するまでコードが有効になります．
+逆に #ifndef は無効になります．
+#else が出現すると，それまでのコードの有無の状態が反転して #endif が出現するまで処理されます．
+ネスト記述が許されていますが，深さは30までです．
+#elif は #else と #ifdef が記述されていることと，同義です．
+
+例)
+[original source file]					[converted source file]
+-------------------------------------------------------------------------------
+#define	aaa						--#define aaa
+
+#ifdef aaa						--#ifdef aaa
+#rand bbb B2						--#rand bbb B2
+#else							--#else
+#rand bbb H4						--#rand bbb H4
+#endif							--#endif
+
+ccc <= bbb;						ccc <= "10";
+
+#undef aaa						--#undef aaa
+#undef bbb						--#undef bbb
+
+#ifndef aaa						--#ifndef aaa
+ccc <= bbb;						ccc <= bbb;
+#else							--#else
+ccc <= ddd;						--ccc <= ddd;
+#endif							--#endif
+
+
+4.8 コードの複製 #for LABEL , #endfor
+~~~~~~~~~~~~~~~~
+#for から #endfor までのコードをラベルが示す数だけ複製します．
+これはネスト記述を許していません．
+
+例)
+[original source file]					[converted source file]
+-------------------------------------------------------------------------------
+#rand aaa B4						--#rand aaa B4
+#for 4							--#for 4
+ad <= aaa;						ad <= "0110";
+wait for ClkT;						wait for ClkT;
+#endfor							--
+							ad <= "1100";
+							wait for ClkT;
+							--
+							ad <= "0101";
+							wait for ClkT;
+							--
+							ad <= "1001";
+							wait for ClkT;
+							--#endfor
+
+
+4.9 メッセージの出力 #message "STRING"
+~~~~~~~~~~~~~~~~~~~~
+#message 以下のブレースで囲まれた文字列をスタンダードアウトへ出力します．
+これはコードには影響を及ぼしません．
+
+例)
+[original source file]					[converted source file]
+-------------------------------------------------------------------------------
+#ifndef LOGICAL						--#ifndef LOGICAL
+#message "A label \"LOGICAL\" is not defined."		--#message "A label \"LOGICAL\" is not defined."
+#endif							--#endif
+
+端末に
+A label "LOGICAL" is not defined.
+が出力されます．
+
+
+
+
+5. ヒント
+=========
+
+5.1 シェル関数
+~~~~~~~~~~~~~~
+シェル関数に以下のような関数を作成しておくと便利です．
+
+# Update Source
+us() {
+    VPP_DEF=""
+    for d in $@
+    do
+      VPP_DEF="$VPP_DEF -D$d"
+    done
+
+    vpp $VPP_DEF ~/cvs/project/packages.vhd ~/ise/project/packages.vhd
+    vpp $VPP_DEF ~/cvs/project/modules.vhd ~/ise/project/modules.vhd
+    vpp $VPP_DEF ~/cvs/project/top.vhd ~/ise/project/top.vhd
+    vpp -s -C'#' $VPP_DEF ~/cvs/project/device.ucf ~/ise/project/device.ucf
+}
+
+
+5.2 メイクファイル
+~~~~~~~~~~~~~~~~~~
+Cygwin上でのMakefileは以下のように記述します．
+
+#
+# Sample makefile for ISE 9.2.03i
+#
+
+HOME=/home/taka
+PROJECT=foo
+DEVICE=xc5vlx30-ff676-1
+TOP=foo_top
+SYN=/cygdrive/c/Xilinx/bin/nt/xst
+NGD=/cygdrive/c/Xilinx/bin/nt/ngdbuild
+MAP=/cygdrive/c/Xilinx/bin/nt/map
+PAR=/cygdrive/c/Xilinx/bin/nt/par
+TRCE=/cygdrive/c/Xilinx/bin/nt/trce
+BITGEN=/cygdrive/c/Xilinx/bin/nt/bitgen
+NETGEN=/cygdrive/c/Xilinx/bin/nt/netgen
+PRJ=${PROJECT}.prj
+LSO=${PROJECT}.lso
+XST=${PROJECT}.xst
+UT=${PROJECT}.ut
+
+all: ts vpp syn trans map pr bit
+	date
+
+clean:
+	rm -rf xst _ngo netgen ${PROJECT}*
+
+ts:
+	date
+
+vpp:
+	vpp ${HOME}/cvs/project/packages.vhd packages.vhd
+	vpp ${HOME}/cvs/project/modules.vhd modules.vhd
+	vpp ${HOME}/cvs/project/${TOP}.vhd ${TOP}.vhd
+	vpp -s -C'#' ${HOME}/cvs/project/${DEVICE}.ucf ${DEVICE}.ucf
+
+logical:
+	vpp -DLOGICAL ${HOME}/cvs/project/packages.vhd packages.vhd
+	vpp -DLOGICAL ${HOME}/cvs/project/modules.vhd modules.vhd
+	vpp -DLOGICAL ${HOME}/cvs/project/${TOP}.vhd ${TOP}.vhd
+
+syn: lso prj xst
+	${SYN} -intstyle xflow -ifn ${XST} -ofn ${PROJECT}.syr
+
+trans:
+	${NGD} -intstyle xflow -dd _ngo -nt timestamp -uc ${TOP}.ucf -p ${DEVICE} ${PROJECT}.ngc ${PROJECT}.ngd
+
+map:
+	${MAP} -intstyle xflow -p ${DEVICE} -w -logic_opt on -ol high -xe n -t 1 -register_duplication -global_opt on -retiming on -equivalent_register_removal on -cm speed -ignore_keep_hierarchy -k 6 -bp -o ${PROJECT}_map.ncd ${PROJECT}.ngd ${PROJECT}.pcf
+
+pr:
+	${PAR} -w -intstyle xflow -ol high -xe n -t 1 ${PROJECT}_map.ncd ${PROJECT}.ncd ${PROJECT}.pcf
+	${TRCE} -intstyle xflow -e 3 -s 1 -xml ${PROJECT} ${PROJECT}.ncd -o ${PROJECT}.twr ${PROJECT}.pcf -ucf ${TOP}.ucf
+
+bit: ut
+	${BITGEN} -intstyle xflow -f ${UT} ${PROJECT}.ncd
+
+lso:
+	@echo "creating lso..."
+	@echo "mylib" > ${LSO}
+	@echo "work" >> ${LSO}
+
+prj:
+	@echo "creating prj..."
+	@echo "vhdl mylib \"packages.vhd\"" > ${PRJ}
+	@echo "vhdl work  \"modules.vhd\"" >> ${PRJ}
+	@echo "vhdl work  \"${TOP}.vhd\"" >> ${PRJ}
+
+xst:
+	@echo "creating xst..."
+	@mkdir -p xst
+	@mkdir -p xst/projnav.tmp
+	@echo "set -tmpdir \"./xst/projnav.tmp\"" > ${XST}
+	@echo "set -xsthdpdir \"./xst\"" >> ${XST}
+	@echo "run" >> ${XST}
+	@echo "-ifn ${PRJ}" >> ${XST}
+	@echo "-ifmt mixed" >> ${XST}
+	@echo "-ofn ${PROJECT}" >> ${XST}
+	@echo "-ofmt NGC" >> ${XST}
+	@echo "-p ${DEVICE}" >> ${XST}
+	@echo "-top ${TOP}" >> ${XST}
+	@echo "-opt_mode Speed" >> ${XST}
+	@echo "-opt_level 2" >> ${XST}
+	@echo "-power NO" >> ${XST}
+	@echo "-iuc NO" >> ${XST}
+	@echo "-lso ${LSO}" >> ${XST}
+	@echo "-keep_hierarchy NO" >> ${XST}
+	@echo "-rtlview Yes" >> ${XST}
+	@echo "-glob_opt AllClockNets" >> ${XST}
+	@echo "-read_cores YES" >> ${XST}
+	@echo "-write_timing_constraints NO" >> ${XST}
+	@echo "-cross_clock_analysis NO" >> ${XST}
+	@echo "-hierarchy_separator /" >> ${XST}
+	@echo "-bus_delimiter <>" >> ${XST}
+	@echo "-case maintain" >> ${XST}
+	@echo "-slice_utilization_ratio 100" >> ${XST}
+	@echo "-bram_utilization_ratio 100" >> ${XST}
+	@echo "-dsp_utilization_ratio 100" >> ${XST}
+	@echo "-verilog2001 YES" >> ${XST}
+	@echo "-fsm_extract YES -fsm_encoding Auto" >> ${XST}
+	@echo "-safe_implementation No" >> ${XST}
+	@echo "-fsm_style lut" >> ${XST}
+	@echo "-ram_extract Yes" >> ${XST}
+	@echo "-ram_style Auto" >> ${XST}
+	@echo "-rom_extract Yes" >> ${XST}
+	@echo "-mux_style Auto" >> ${XST}
+	@echo "-decoder_extract YES" >> ${XST}
+	@echo "-priority_extract YES" >> ${XST}
+	@echo "-shreg_extract YES" >> ${XST}
+	@echo "-shift_extract YES" >> ${XST}
+	@echo "-xor_collapse YES" >> ${XST}
+	@echo "-rom_style Auto" >> ${XST}
+	@echo "-auto_bram_packing NO" >> ${XST}
+	@echo "-mux_extract YES" >> ${XST}
+	@echo "-resource_sharing YES" >> ${XST}
+	@echo "-async_to_sync NO" >> ${XST}
+	@echo "-use_dsp48 auto" >> ${XST}
+	@echo "-iobuf YES" >> ${XST}
+	@echo "-max_fanout 100000" >> ${XST}
+	@echo "-bufg 32" >> ${XST}
+	@echo "-register_duplication YES" >> ${XST}
+	@echo "-register_balancing No" >> ${XST}
+	@echo "-slice_packing YES" >> ${XST}
+	@echo "-optimize_primitives NO" >> ${XST}
+	@echo "-use_clock_enable Yes" >> ${XST}
+	@echo "-use_sync_set Yes" >> ${XST}
+	@echo "-use_sync_reset Yes" >> ${XST}
+	@echo "-iob auto" >> ${XST}
+	@echo "-equivalent_register_removal YES" >> ${XST}
+	@echo "-slice_utilization_ratio_maxmargin 5" >> ${XST}
+
+ut:
+	@echo "creating ut..."
+	@echo "-w" > ${UT}
+	@echo "-g DebugBitstream:No" >> ${UT}
+	@echo "-g Binary:no" >> ${UT}
+	@echo "-g CRC:Enable" >> ${UT}
+	@echo "-g ConfigRate:2" >> ${UT}
+	@echo "-g CclkPin:PullUp" >> ${UT}
+	@echo "-g M0Pin:PullUp" >> ${UT}
+	@echo "-g M1Pin:PullUp" >> ${UT}
+	@echo "-g M2Pin:PullUp" >> ${UT}
+	@echo "-g ProgPin:PullUp" >> ${UT}
+	@echo "-g DonePin:PullUp" >> ${UT}
+	@echo "-g InitPin:Pullup" >> ${UT}
+	@echo "-g CsPin:Pullup" >> ${UT}
+	@echo "-g DinPin:Pullup" >> ${UT}
+	@echo "-g BusyPin:Pullup" >> ${UT}
+	@echo "-g RdWrPin:Pullup" >> ${UT}
+	@echo "-g TckPin:PullUp" >> ${UT}
+	@echo "-g TdiPin:PullUp" >> ${UT}
+	@echo "-g TdoPin:PullUp" >> ${UT}
+	@echo "-g TmsPin:PullUp" >> ${UT}
+	@echo "-g UnusedPin:PullDown" >> ${UT}
+	@echo "-g UserID:0xFFFFFFFF" >> ${UT}
+	@echo "-g RetainConfigStatus:Yes" >> ${UT}
+	@echo "-g ConfigFallback:Enable" >> ${UT}
+	@echo "-g SelectMAPAbort:Enable" >> ${UT}
+	@echo "-g BPI_page_size:1" >> ${UT}
+	@echo "-g OverTempPowerDown:Disable" >> ${UT}
+	@echo "-g DCIUpdateMode:AsRequired" >> ${UT}
+	@echo "-g StartUpClk:CClk" >> ${UT}
+	@echo "-g DONE_cycle:4" >> ${UT}
+	@echo "-g GTS_cycle:5" >> ${UT}
+	@echo "-g GWE_cycle:6" >> ${UT}
+	@echo "-g LCK_cycle:NoWait" >> ${UT}
+	@echo "-g Match_cycle:Auto" >> ${UT}
+	@echo "-g Security:None" >> ${UT}
+	@echo "-g DonePipe:No" >> ${UT}
+	@echo "-g DriveDone:No" >> ${UT}
+	@echo "-g Encrypt:No" >> ${UT}
+
+
+5.3 ラインのバッファサイズ
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+デフォルトでは1行で扱える文字数は4000です．
+これを越える場合は configure 時に --with-lbs オプションを用いて変更して下さい．
+
+
+5.4 行数の変化
+~~~~~~~~~~~~~~
+/* */ を用いたコメントアウトを利用するとき，VHDLの仕様上，閉じ側の */ 以降に文字が存在する場合，それは改行されて有効化されます．
+つまり，変換前と変換後のソースコードの行数が異ってしまいます．
+例えば，論理合成ツールが差し示すエラーの行とオリジナルファイルでの行が異ってしまうことに注意して下さい．
+行の末端に記述するか，*/ だけの行にすることをお勧めします．
+ただし，#include と #for を使用している場合はこの注意は不要になりますが．
