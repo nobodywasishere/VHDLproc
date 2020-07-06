@@ -24,7 +24,7 @@
 #define	__TAKA_VPP_H__
 
 #include <stdio.h>
-#include "taka/list.h"
+#include "list.h"
 
 #ifdef __cplusplus
 extern "C" {

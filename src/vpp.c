@@ -32,8 +32,8 @@
 #include <unistd.h>
 #include <iconv.h>
 #include <errno.h>
-#include "taka/list.h"
-#include "taka/string.h"
+#include "list.h"
+#include "string.h"
 #include "vpp.h"
 
 #ifndef LINE_BUFFER_SIZE
@@ -112,7 +112,7 @@ inline static void taka_tvpp_certification(FILE *fp, const char *orig_file, cons
   fprintf(fp, "%c%c Preprocessed with vpp-%s\n", cc, cc, VERSION);
   realpath(orig_file, rp);
   fprintf(fp, "%c%c for %s\n", cc, cc, rp);
-  fprintf(fp, "%c%c by %s\n", cc, cc, secure_getenv("USER"));
+  fprintf(fp, "%c%c by %s\n", cc, cc, "USER");
   //fprintf(fp, "%c%c on %s\n", cc, cc, secure_getenv("HOSTNAME"));
   gethostname(rp, sizeof (rp));
   fprintf(fp, "%c%c on %s\n", cc, cc, rp);
