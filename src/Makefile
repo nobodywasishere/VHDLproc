@@ -20,7 +20,7 @@
 #
 
 CC=gcc
-PACKAGE_BUGREPORT=
+PACKAGE_BUGREPORT='\"\"'
 INSTALL_PREFIX=/usr/local/bin
 
 PROGNAME=vhdlproc
