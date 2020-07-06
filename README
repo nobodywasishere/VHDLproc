@@ -1,0 +1,457 @@
+vpp / VHDL PreProcessor README
+Copyright (c) 2006-2009 Takashige Sugie <takashige@users.sourceforge.net>, All rights reserved.
+
+
+
+
+1. Introduction
+===============
+
+Vpp is a simple VHDL preprocessor on command-line.
+Its preprocess symbols have cpp-like functions.
+For example, multi-line comment out, conditional comment out and including source code from a file.
+As original functions, random number generator, source code replication and so on.
+
+
+
+
+2. Install / Uninstall
+======================
+
+2.1 Install
+~~~~~~~~~~~
+Download the latest source package from http://sourceforge.net/projects/vhdlpp/.
+Extract it.
+
+% tar Jxvf vpp-x.y.z.tar.xz
+
+Change the directory which is extracted.
+Execute a configure script.
+
+% cd vpp-x.y.z
+% ./configure
+
+Compile and install.
+
+% make
+% make install
+
+If normally exit, vpp has been installed in PREFIX directory.
+Make sure that $PATH has PREFIX directory.
+
+2.2 Uninstall
+~~~~~~~~~~~~~
+Only delete an executable file in PREFIX directory.
+
+% rm PREFIX/vpp
+
+
+
+
+3. Usage
+========
+
+% vpp [option] OriginalFileName ConvertedFileName
+
+Vpp reads source code from a file whose name is "OriginalFileName".
+Vpp compiles it according to the preprocess symbols.
+Vpp writes converted source code to a file whose name is "ConvertedFileName".
+
+Options
+~~~~~~~
+-D, --define=<label>	Define a label for conditional comment out on command-line. (refer to 4.3)
+-C, --comment=<char>	Define a comment out character. The default is '-'.
+-s, --silent		No message is printed to the standard output stream.
+-v, --version		Print vpp version string.
+-h, --help		Print help.
+
+
+
+
+4. Preprocess symbols
+=====================
+
+4.1 Multi-line comment out: /* */
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Source code is to be comment from /* to */.
+This preprocess symbol is the highest priority in all preprocess symbols.
+Therefore, a preprocess symbol which has a sharp, is invalid within this preprocess symbol.
+
+ex.)
+[original source file]					[converted source file]
+-------------------------------------------------------------------------------
+/*							--
+a <= b + c;						--a <= b + c;
+d <= e - f;						--d <= e - f;
+*/							--*/
+a <= b - c;						a <= b - c;
+d <= e + f;						d <= e + f;
+
+g <= a + d;						g <= a + d;
+
+
+4.2 Include source code from a file: #include "FILENAME"
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Source code in a file whose name is FILENAME, is copied here.
+
+ex.)
+[a file whose name is "clk bench.vhd"]
+-------------------------------------------------------------------------------
+process begin
+	PCI_Clk <= transport '1';
+	wait for PciClkT / 2;
+	PCI_Clk <= transport '0';
+	wait for PciClkT / 2;
+end process;
+
+[original source file]					[converted source file]
+-------------------------------------------------------------------------------
+#include "clk bench.vhd"				--#include "clk bench.vhd"
+							process begin
+process begin							PCI_Clk <= transport '1';
+	wait;							wait for PciClkT / 2;
+end process;							PCI_Clk <= transport '0';
+								wait for PciClkT / 2;
+							end process;
+
+							process begin
+								wait;
+							end process;
+
+
+4.3 Define a label for #if, #ifndef and #elif: #define LABEL
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A label is defined for #ifdef, #ifndef and #elif.
+A label must be a single word.
+
+ex.) refer to 4.7
+
+
+4.4 Replace a label with a string: #define LABEL "STRING"
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A label is replaced by following string.
+A label must be a single word.
+
+ex.)
+[original source file]					[converted source file]
+-------------------------------------------------------------------------------
+#define cbe_t "std_logic_vector(3 downto 0)"		--#define cbe_t "std_logic_vector(3 downto 0)"
+
+signal pci_cbe:		cbe_t;				signal pci_cbe:		std_logic_vector(3 downto 0);
+
+
+4.5 Generate a random string: #rand LABEL FORMAT
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A label is replaced by generated random characters according to format.
+A format has an alphabet for radix and a digit number to generating.
+An alphabet for radix has the kinds as follows:
+B, b	: binary number
+D, d	: deciaml number
+H, h	: hexadeciaml number.
+
+ex.)
+[original source file]					[converted source file]
+-------------------------------------------------------------------------------
+#rand aaa B1						--#rand aaa B1
+#rand bbb b5						--#rand bbb b5
+#rand ccc D6						--#rand ccc D6
+#rand ddd h8						--#rand ddd h8
+
+e <= aaa;						e <= '1';
+f <= bbb;						f <= "10110";
+g <= ccc;						g <= 309274;
+h <= ddd;						h <= X"a5cb907d";
+
+
+4.6 Undefine a defined label by #define and #rand: #undef LABEL
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A label which has been defined by #define or #rand, is deleted.
+
+ex.)
+[original source file]					[converted source file]
+-------------------------------------------------------------------------------
+#rand aaa B1						--#rand aaa B1
+
+e <= aaa;						e <= '0';
+
+#undef aaa						--#undef aaa
+
+f <= aaa;						f <= aaa;
+
+
+4.7 Conditional comment out: #ifdef LABEL , #ifndef LABEL , #elif , #else , #endif
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If a label has been defined by #define, below source code is valid until #else or #endif are found.
+In the case of #ifndef, its are invalid.
+If #else is found, the valid status is reversed and continue.
+The nest description is permit. (depth is less than 30)
+#elif is equal to describe #else and #ifdef.
+
+ex.)
+[original source file]					[converted source file]
+-------------------------------------------------------------------------------
+#define aaa						--#define aaa
+
+#ifdef aaa						--#ifdef aaa
+#rand bbb B2						--#rand bbb B2
+#else							--#else
+#rand bbb H4						--#rand bbb H4
+#endif							--#endif
+
+ccc <= bbb;						ccc <= "10";
+
+#undef aaa						--#undef aaa
+#undef bbb						--#undef bbb
+
+#ifndef aaa						--#ifndef aaa
+ccc <= bbb;						ccc <= bbb;
+#else							--#else
+ccc <= ddd;						--ccc <= ddd;
+#endif							--#endif
+
+
+4.8 Duplicate source code: #for LABEL , #endfor
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Source code is duplicated from #for to #endfor LABEL times.
+The nest description is NOT permit.
+
+ex.)
+[original source file]					[converted source file]
+-------------------------------------------------------------------------------
+#rand aaa B4						--#rand aaa B4
+#for 4							--#for 4
+ad <= aaa;						ad <= "0110";
+wait for ClkT;						wait for ClkT;
+#endfor							--
+							ad <= "1100";
+							wait for ClkT;
+							--
+							ad <= "0101";
+							wait for ClkT;
+							--
+							ad <= "1001";
+							wait for ClkT;
+							--#endfor
+
+
+4.9 Print a message: #message "STRING"
+~~~~~~~~~~~~~~~~~~~
+Print a string to the standard output stream.
+This preprocess symbol has no effect to source code.
+
+ex.)
+[original source file]					[converted source file]
+-------------------------------------------------------------------------------
+#ifndef LOGICAL						--#ifndef LOGICAL
+#message "A label \"LOGICAL\" is not defined."		--#message "A label \"LOGICAL\" is not defined."
+#endif							--#endif
+
+[standard output stream]
+-------------------------------------------------------------------------------
+A label "LOGICAL" is not defined.
+
+
+
+
+5. Tips
+=======
+
+5.1 Shell function
+~~~~~~~~~~~~~~~~~~
+It's very useful to define a shell function as the below function.
+
+# Update Source
+us() {
+    VPP_DEF=""
+    for d in $@
+    do
+      VPP_DEF="$VPP_DEF -D$d"
+    done
+
+    vpp $VPP_DEF ~/cvs/project/packages.vhd ~/ise/project/packages.vhd
+    vpp $VPP_DEF ~/cvs/project/modules.vhd ~/ise/project/modules.vhd
+    vpp $VPP_DEF ~/cvs/project/top.vhd ~/ise/project/top.vhd
+    vpp -s -C'#' $VPP_DEF ~/cvs/project/device.ucf ~/ise/project/device.ucf
+}
+
+
+5.2 Makefile
+~~~~~~~~~~~~
+Sample makefile for ISE-9.2.03i on cygwin.
+
+#
+# Sample makefile for ISE 9.2.03i
+#
+
+HOME=/home/taka
+PROJECT=foo
+DEVICE=xc5vlx30-ff676-1
+TOP=foo_top
+SYN=/cygdrive/c/Xilinx/bin/nt/xst
+NGD=/cygdrive/c/Xilinx/bin/nt/ngdbuild
+MAP=/cygdrive/c/Xilinx/bin/nt/map
+PAR=/cygdrive/c/Xilinx/bin/nt/par
+TRCE=/cygdrive/c/Xilinx/bin/nt/trce
+BITGEN=/cygdrive/c/Xilinx/bin/nt/bitgen
+NETGEN=/cygdrive/c/Xilinx/bin/nt/netgen
+PRJ=${PROJECT}.prj
+LSO=${PROJECT}.lso
+XST=${PROJECT}.xst
+UT=${PROJECT}.ut
+
+all: ts vpp syn trans map pr bit
+	date
+
+clean:
+	rm -rf xst _ngo netgen ${PROJECT}*
+
+ts:
+	date
+
+vpp:
+	vpp ${HOME}/cvs/project/packages.vhd packages.vhd
+	vpp ${HOME}/cvs/project/modules.vhd modules.vhd
+	vpp ${HOME}/cvs/project/${TOP}.vhd ${TOP}.vhd
+	vpp -s -C'#' ${HOME}/cvs/project/${DEVICE}.ucf ${DEVICE}.ucf
+
+logical:
+	vpp -DLOGICAL ${HOME}/cvs/project/packages.vhd packages.vhd
+	vpp -DLOGICAL ${HOME}/cvs/project/modules.vhd modules.vhd
+	vpp -DLOGICAL ${HOME}/cvs/project/${TOP}.vhd ${TOP}.vhd
+
+syn: lso prj xst
+	${SYN} -intstyle xflow -ifn ${XST} -ofn ${PROJECT}.syr
+
+trans:
+	${NGD} -intstyle xflow -dd _ngo -nt timestamp -uc ${TOP}.ucf -p ${DEVICE} ${PROJECT}.ngc ${PROJECT}.ngd
+
+map:
+	${MAP} -intstyle xflow -p ${DEVICE} -w -logic_opt on -ol high -xe n -t 1 -register_duplication -global_opt on -retiming on -equivalent_register_removal on -cm speed -ignore_keep_hierarchy -k 6 -bp -o ${PROJECT}_map.ncd ${PROJECT}.ngd ${PROJECT}.pcf
+
+pr:
+	${PAR} -w -intstyle xflow -ol high -xe n -t 1 ${PROJECT}_map.ncd ${PROJECT}.ncd ${PROJECT}.pcf
+	${TRCE} -intstyle xflow -e 3 -s 1 -xml ${PROJECT} ${PROJECT}.ncd -o ${PROJECT}.twr ${PROJECT}.pcf -ucf ${TOP}.ucf
+
+bit: ut
+	${BITGEN} -intstyle xflow -f ${UT} ${PROJECT}.ncd
+
+lso:
+	@echo "creating lso..."
+	@echo "mylib" > ${LSO}
+	@echo "work" >> ${LSO}
+
+prj:
+	@echo "creating prj..."
+	@echo "vhdl mylib \"packages.vhd\"" > ${PRJ}
+	@echo "vhdl work  \"modules.vhd\"" >> ${PRJ}
+	@echo "vhdl work  \"${TOP}.vhd\"" >> ${PRJ}
+
+xst:
+	@echo "creating xst..."
+	@mkdir -p xst
+	@mkdir -p xst/projnav.tmp
+	@echo "set -tmpdir \"./xst/projnav.tmp\"" > ${XST}
+	@echo "set -xsthdpdir \"./xst\"" >> ${XST}
+	@echo "run" >> ${XST}
+	@echo "-ifn ${PRJ}" >> ${XST}
+	@echo "-ifmt mixed" >> ${XST}
+	@echo "-ofn ${PROJECT}" >> ${XST}
+	@echo "-ofmt NGC" >> ${XST}
+	@echo "-p ${DEVICE}" >> ${XST}
+	@echo "-top ${TOP}" >> ${XST}
+	@echo "-opt_mode Speed" >> ${XST}
+	@echo "-opt_level 2" >> ${XST}
+	@echo "-power NO" >> ${XST}
+	@echo "-iuc NO" >> ${XST}
+	@echo "-lso ${LSO}" >> ${XST}
+	@echo "-keep_hierarchy NO" >> ${XST}
+	@echo "-rtlview Yes" >> ${XST}
+	@echo "-glob_opt AllClockNets" >> ${XST}
+	@echo "-read_cores YES" >> ${XST}
+	@echo "-write_timing_constraints NO" >> ${XST}
+	@echo "-cross_clock_analysis NO" >> ${XST}
+	@echo "-hierarchy_separator /" >> ${XST}
+	@echo "-bus_delimiter <>" >> ${XST}
+	@echo "-case maintain" >> ${XST}
+	@echo "-slice_utilization_ratio 100" >> ${XST}
+	@echo "-bram_utilization_ratio 100" >> ${XST}
+	@echo "-dsp_utilization_ratio 100" >> ${XST}
+	@echo "-verilog2001 YES" >> ${XST}
+	@echo "-fsm_extract YES -fsm_encoding Auto" >> ${XST}
+	@echo "-safe_implementation No" >> ${XST}
+	@echo "-fsm_style lut" >> ${XST}
+	@echo "-ram_extract Yes" >> ${XST}
+	@echo "-ram_style Auto" >> ${XST}
+	@echo "-rom_extract Yes" >> ${XST}
+	@echo "-mux_style Auto" >> ${XST}
+	@echo "-decoder_extract YES" >> ${XST}
+	@echo "-priority_extract YES" >> ${XST}
+	@echo "-shreg_extract YES" >> ${XST}
+	@echo "-shift_extract YES" >> ${XST}
+	@echo "-xor_collapse YES" >> ${XST}
+	@echo "-rom_style Auto" >> ${XST}
+	@echo "-auto_bram_packing NO" >> ${XST}
+	@echo "-mux_extract YES" >> ${XST}
+	@echo "-resource_sharing YES" >> ${XST}
+	@echo "-async_to_sync NO" >> ${XST}
+	@echo "-use_dsp48 auto" >> ${XST}
+	@echo "-iobuf YES" >> ${XST}
+	@echo "-max_fanout 100000" >> ${XST}
+	@echo "-bufg 32" >> ${XST}
+	@echo "-register_duplication YES" >> ${XST}
+	@echo "-register_balancing No" >> ${XST}
+	@echo "-slice_packing YES" >> ${XST}
+	@echo "-optimize_primitives NO" >> ${XST}
+	@echo "-use_clock_enable Yes" >> ${XST}
+	@echo "-use_sync_set Yes" >> ${XST}
+	@echo "-use_sync_reset Yes" >> ${XST}
+	@echo "-iob auto" >> ${XST}
+	@echo "-equivalent_register_removal YES" >> ${XST}
+	@echo "-slice_utilization_ratio_maxmargin 5" >> ${XST}
+
+ut:
+	@echo "creating ut..."
+	@echo "-w" > ${UT}
+	@echo "-g DebugBitstream:No" >> ${UT}
+	@echo "-g Binary:no" >> ${UT}
+	@echo "-g CRC:Enable" >> ${UT}
+	@echo "-g ConfigRate:2" >> ${UT}
+	@echo "-g CclkPin:PullUp" >> ${UT}
+	@echo "-g M0Pin:PullUp" >> ${UT}
+	@echo "-g M1Pin:PullUp" >> ${UT}
+	@echo "-g M2Pin:PullUp" >> ${UT}
+	@echo "-g ProgPin:PullUp" >> ${UT}
+	@echo "-g DonePin:PullUp" >> ${UT}
+	@echo "-g InitPin:Pullup" >> ${UT}
+	@echo "-g CsPin:Pullup" >> ${UT}
+	@echo "-g DinPin:Pullup" >> ${UT}
+	@echo "-g BusyPin:Pullup" >> ${UT}
+	@echo "-g RdWrPin:Pullup" >> ${UT}
+	@echo "-g TckPin:PullUp" >> ${UT}
+	@echo "-g TdiPin:PullUp" >> ${UT}
+	@echo "-g TdoPin:PullUp" >> ${UT}
+	@echo "-g TmsPin:PullUp" >> ${UT}
+	@echo "-g UnusedPin:PullDown" >> ${UT}
+	@echo "-g UserID:0xFFFFFFFF" >> ${UT}
+	@echo "-g RetainConfigStatus:Yes" >> ${UT}
+	@echo "-g ConfigFallback:Enable" >> ${UT}
+	@echo "-g SelectMAPAbort:Enable" >> ${UT}
+	@echo "-g BPI_page_size:1" >> ${UT}
+	@echo "-g OverTempPowerDown:Disable" >> ${UT}
+	@echo "-g DCIUpdateMode:AsRequired" >> ${UT}
+	@echo "-g StartUpClk:CClk" >> ${UT}
+	@echo "-g DONE_cycle:4" >> ${UT}
+	@echo "-g GTS_cycle:5" >> ${UT}
+	@echo "-g GWE_cycle:6" >> ${UT}
+	@echo "-g LCK_cycle:NoWait" >> ${UT}
+	@echo "-g Match_cycle:Auto" >> ${UT}
+	@echo "-g Security:None" >> ${UT}
+	@echo "-g DonePipe:No" >> ${UT}
+	@echo "-g DriveDone:No" >> ${UT}
+	@echo "-g Encrypt:No" >> ${UT}
+
+
+5.3 Line buffer size
+~~~~~~~~~~~~~~~~~~~~
+Number of characters in a line is less than 4000 at the default.
+Please reconfigure with --with-lbs option.
