@@ -27,7 +27,7 @@ PROGNAME=vhdlproc
 
 all:
 	-rm vhdlproc
-	$(CC) -DVERSION="\"1.0\"" -DFALSE=0 -DTRUE=1 -DPACKAGE_BUGREPORT=$(PACKAGE_BUGREPORT) -o $(PROGNAME) string.h string.c main.c vpp.c vpp.h
+	$(CC) -DVERSION="\"1.0\"" -DPACKAGE_BUGREPORT=$(PACKAGE_BUGREPORT) -o $(PROGNAME) string.h string.c main.c vpp.c vpp.h
 
 install:
 	sudo cp $(PROGNAME) $(INSTALL_PREFIX)

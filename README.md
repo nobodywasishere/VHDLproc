@@ -144,3 +144,7 @@ stdout:
 ```
 You asked me to print this message
 ```
+
+## TODO
+* Batch convert files
+* Default conversion file name based on original filename

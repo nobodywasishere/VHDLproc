@@ -33,6 +33,9 @@
 # define VERSION 0
 # endif
 
+# define TRUE 1
+# define FALSE 0
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <getopt.h>
@@ -75,16 +78,16 @@ int main(int argc, char **argv)
             switch (option) {
                 case 'D':
                     if (optarg) {
-                    d = taka_tvpp_define_label(d, optarg);
+                        d = taka_tvpp_define_label(d, optarg);
                     } else {
-                    help();
+                        help();
                     }
                     break;
                 case 'C':
                     if (optarg) {
-                    cc = optarg[0];
+                        cc = optarg[0];
                     } else {
-                    help();
+                        help();
                     }
                     break;
                 case 's':
