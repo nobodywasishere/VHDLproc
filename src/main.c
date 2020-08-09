@@ -188,7 +188,7 @@ void print_copyright() {
     printf(
         "------------------------------------------------------------------------------\n"
         "VHDLproc / VHDL PreProcessor, version %s\n"
-        "Copyright (c) 2020 Michael Riegert <%s>\n"
+        "Copyright (c) 2020 Michael Riegert <michael@eowyn.net>\n"
         "Copyright (c) 2006-2020 Takashige Sugie <takashige@users.sourceforge.net>\n"
         "Licensed under General Public License version 3 or later\n\n"
 
@@ -197,6 +197,6 @@ void print_copyright() {
         "Copyright (c) 2006-2020 Takashige Sugie <takashige@users.sourceforge.net>\n"
         "Licensed under General Public License version 2 or later\n"
         "------------------------------------------------------------------------------\n\n",
-        VERSION, PACKAGE_BUGREPORT
+        VERSION
     );
 }

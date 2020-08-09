@@ -20,15 +20,13 @@
 #
 
 CC=gcc
-PACKAGE_BUGREPORT='\"\"'
 INSTALL_PREFIX=/usr/local/bin
-
 PROGNAME=vhdlproc
+SRCDIR=src
 
 all:
 	-rm vhdlproc
-	$(CC) -DVERSION="\"1.0\"" -DPACKAGE_BUGREPORT=$(PACKAGE_BUGREPORT) -o $(PROGNAME) string.h string.c main.c vpp.c vpp.h
-
+	$(CC) -DVERSION="\"1.0\"" -o $(PROGNAME) $(SRCDIR)/*.h $(SRCDIR)/*.c
 install:
 	sudo cp $(PROGNAME) $(INSTALL_PREFIX)
 
