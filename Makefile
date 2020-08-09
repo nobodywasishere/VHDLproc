@@ -22,13 +22,17 @@
 CC=gcc
 INSTALL_PREFIX=/usr/local/bin
 PROGNAME=vhdlproc
-SRCDIR=src
+PROGVER='"1.0"'
+SRCDIR=../src
 
 all:
-	-rm vhdlproc
-	$(CC) -DVERSION="\"1.0\"" -o $(PROGNAME) $(SRCDIR)/*.h $(SRCDIR)/*.c
+	-mkdir -p build
+	-cd build && rm vhdlproc
+	-cd build && $(CC) -DVERSION=$(PROGVER) -o $(PROGNAME) $(SRCDIR)/*.h $(SRCDIR)/*.c
+
 install:
-	sudo cp $(PROGNAME) $(INSTALL_PREFIX)
+	sudo mkdir -p $(INSTALL_PREFIX)
+	sudo cp build/$(PROGNAME) $(INSTALL_PREFIX)
 
 uninstall:
 	sudo rm "$(INSTALL_PREFIX)/$(PROGNAME)"
