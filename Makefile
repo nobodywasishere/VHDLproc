@@ -24,15 +24,20 @@ INSTALL_PREFIX=/usr/local/bin
 PROGNAME=vhdlproc
 PROGVER='"1.0"'
 SRCDIR=../src
+TESTS=(comment define for include message rand undef)
 
 all:
 	-mkdir -p build
 	-cd build && rm vhdlproc
 	-cd build && $(CC) -DVERSION=$(PROGVER) -o $(PROGNAME) $(SRCDIR)/*.h $(SRCDIR)/*.c
+	
+test:
+	for t in ${TESTS[@]}; do echo $t; done
 
 install:
 	sudo mkdir -p $(INSTALL_PREFIX)
 	sudo cp build/$(PROGNAME) $(INSTALL_PREFIX)
 
-uninstall:
-	sudo rm "$(INSTALL_PREFIX)/$(PROGNAME)"
+clean:
+	rm -f tests/*-out.vhdl
+	rm -f build/vhdlproc

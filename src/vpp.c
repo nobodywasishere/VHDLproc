@@ -121,7 +121,7 @@ inline static void taka_tvpp_certification(FILE *fp, const char *orig_file, cons
     char rp[FILENAME_MAX];
 
     fprintf(fp, "\n\n%c%c\n", cc, cc);
-    fprintf(fp, "%c%c Preprocessed with vpp-%s\n", cc, cc, VERSION);
+    fprintf(fp, "%c%c Preprocessed with VHDLproc v%s\n", cc, cc, VERSION);
     realpath(orig_file, rp);
     fprintf(fp, "%c%c for %s\n", cc, cc, rp);
     # ifdef USER

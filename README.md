@@ -145,6 +145,17 @@ stdout:
 You asked me to print this message
 ```
 
+## Tests
+
+- [x] comment.vhdl - test for multiline comments
+- [x] define.vhdl - test for defining a label and using it with if statements
+- [x] for.vhdl - test for for loops with integer
+- [x] include.vhdl / include-to.vhdl - test for including one file in another
+- [x] message.vhdl - test for printing string to stdout
+- [x] rand.vhdl - test for rand label generation
+- [ ] undef.vhdl - test for undefining a label (currently produces segmentation fault)
+
 ## TODO
+* Fix Makefile and include automatic testing
 * Batch convert files
 * Default conversion file name based on original filename
