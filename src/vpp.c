@@ -26,7 +26,7 @@
 */
 
 # ifndef VERSION
-# define VERSION 0
+# define VERSION "0"
 # endif
 
 # define TRUE 1
@@ -40,8 +40,6 @@
 #include <unistd.h>
 #include <iconv.h>
 #include <errno.h>
-#include "list.h"
-#include "string.h"
 #include "vpp.h"
 
 #ifndef LINE_BUFFER_SIZE
@@ -243,37 +241,39 @@ static inline char * taka_tvpp_check_symbol(taka_tvpp_data_t *d, FILE *cerr)
                     d->rand = l;
                     break;
                 default:
-                    if (cerr)
+                    if (cerr) {
                         fprintf(cerr, "Unknown radix for #rand was found at line %d.\n", d->line_num);
                         break;
+                    }
                 }
             break;
         case 3: // undef
-            if (d->ifstat) break;
-            if (d->replace) {
-                tlist_for_reverse(l, d->replace) {
-                    if (!strcmp(((taka_tvpp_str_pair_t *)l->data)->org, d->label)) {
-                        d->replace = tlist_free(l, taka_tvpp_tlist_str_pair_free);
-                    }
-                }
-                d->replace = tlist_last(d->replace);
-            }
-            if (d->defined) {
-                tlist_for_reverse(l, d->defined) {
-                    if (!strcmp(l->data, d->label)) {
-                        d->defined = tlist_free(l, NULL);
-                    }
-                }
-                d->defined = tlist_last(d->defined);
-            }
-            if (d->rand) {
-                tlist_for_reverse(l, d->rand) {
-                    if (!strcmp(((taka_tvpp_str_pair_t *)l->data)->org, d->label)) {
-                        d->rand = tlist_free(l, taka_tvpp_tlist_str_pair_free);
-                    }
-                }
-                d->rand = tlist_last(d->rand);
-            }
+            // UNDEF SEGFAULTS
+            // if (d->ifstat) break;
+            // if (d->replace) {
+            //     tlist_for_reverse(l, d->replace) {
+            //         if (!strcmp(((taka_tvpp_str_pair_t *)l->data)->org, d->label)) {
+            //             d->replace = tlist_free(l, taka_tvpp_tlist_str_pair_free);
+            //         }
+            //     }
+            //     d->replace = tlist_last(d->replace);
+            // }
+            // if (d->defined) {
+            //     tlist_for_reverse(l, d->defined) {
+            //         if (!strcmp(l->data, d->label)) {
+            //             d->defined = tlist_free(l, NULL);
+            //         }
+            //     }
+            //     d->defined = tlist_last(d->defined);
+            // }
+            // if (d->rand) {
+            //     tlist_for_reverse(l, d->rand) {
+            //         if (!strcmp(((taka_tvpp_str_pair_t *)l->data)->org, d->label)) {
+            //             d->rand = tlist_free(l, taka_tvpp_tlist_str_pair_free);
+            //         }
+            //     }
+            //     d->rand = tlist_last(d->rand);
+            // }
             break;
         case 4: // ifdef
         case 5: // ifndef

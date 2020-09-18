@@ -1,43 +1,47 @@
+# ------------------------------------------------
+# Generic Makefile
 #
-#  VHDLproc - VHDL preprocessor
-#  Copyright (c) 2020 Michael Riegert <michael@eowyn.net>
+# Author: yanick.rochon@gmail.com
+# Date  : 2011-08-10
 #
+# Changelog :
+#   2010-11-05 - first version
+#   2011-08-10 - added structure : sources, objects, binaries
+#				thanks to http://stackoverflow.com/users/128940/beta
+#   2017-04-24 - changed order of linker params
+# ------------------------------------------------
 
-#
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; either version 3
-#  of the License, or (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-#
+TARGET   = vhdlproc
+VERSION  = \"1.0.0\"
 
-CC=gcc
-INSTALL_PREFIX=/usr/local/bin
-PROGNAME=vhdlproc
-PROGVER='"1.0"'
-SRCDIR=../src
-TESTS=(comment define for include message rand undef)
+CC	     = gcc
+CFLAGS   = -Wall -Wextra -I. -DVERSION="${VERSION}"
 
-all:
-	-mkdir -p build
-	-cd build && rm vhdlproc
-	-cd build && $(CC) -DVERSION=$(PROGVER) -o $(PROGNAME) $(SRCDIR)/*.h $(SRCDIR)/*.c
-	
-test:
-	for t in ${TESTS[@]}; do echo $t; done
+LINKER   = gcc
+# linking flags here
+LFLAGS   = -Wall -I. -lm
 
-install:
-	sudo mkdir -p $(INSTALL_PREFIX)
-	sudo cp build/$(PROGNAME) $(INSTALL_PREFIX)
+# change these to proper directories where each file should be
+SRCDIR   = src
+OBJDIR   = obj
+BINDIR   = bin
 
+SOURCES  := $(wildcard $(SRCDIR)/*.c)
+INCLUDES := $(wildcard $(SRCDIR)/*.h)
+OBJECTS  := $(SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
+rm	     = rm -f
+
+
+$(BINDIR)/$(TARGET): $(OBJECTS)
+	@$(LINKER) $(OBJECTS) $(LFLAGS) -o $@
+
+$(OBJECTS): $(OBJDIR)/%.o : $(SRCDIR)/%.c
+	@$(CC) $(CFLAGS) -c $< -o $@
+
+.PHONY: clean
 clean:
-	rm -f tests/*-out.vhdl
-	rm -f build/vhdlproc
+	@$(rm) $(OBJECTS)
+
+.PHONY: remove
+remove: clean
+	@$(rm) $(BINDIR)/$(TARGET)

@@ -30,7 +30,7 @@
 #endif
 
 # ifndef VERSION
-# define VERSION 0
+# define VERSION "0"
 # endif
 
 # define TRUE 1
@@ -39,7 +39,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <getopt.h>
-#include <string.h>
+#include "string.h"
 #include "vpp.h"
 
 #define FONT_DEFAULT      "\x1b[0m"
@@ -74,7 +74,7 @@ int main(int argc, char **argv)
             {0, 0, 0, 0}
         };
 
-        while ((option = getopt_long(argc, argv, "D:C:stvhl", LongOptions, 0)) != EOF) {
+        while ((option = getopt_long(argc, argv, "D:C:stvhlc", LongOptions, 0)) != EOF) {
             switch (option) {
                 case 'D':
                     if (optarg) {
@@ -101,6 +101,10 @@ int main(int argc, char **argv)
                     return (0);
                 case 'l':
                     list_ppd();
+                    return (0);
+                case 'c':
+                    print_copyright();
+                    return (0);
                 case 'h':
                 default:
                     help();
@@ -131,20 +135,18 @@ int main(int argc, char **argv)
 }
 
 void help() {
-    print_copyright();
     printf(
-        "------------------------------------------------------------------------------\n"
         "Usage: vhdlproc [-DCstvhl] InputFile OutputFile\n\n"
 
         "Options:\n"
         "-D, --define=<label>        Define <label>\n"
         "-C, --comment=<char>        Comment out character (default:'-')\n"
+        "-c                          Print copyright information\n"
         "-s, --silent                Print no message\n"
         "-t, --template              Create a template file\n"
         "-v, --version               Print version\n"
         "-h, --help                  Print vhdlproc options\n"
         "-l, --listppd               Print preprocessing directives\n"
-        "------------------------------------------------------------------------------\n"
     );
 
     exit(0);
@@ -152,9 +154,7 @@ void help() {
 
 void list_ppd() {
     // Lists the preprocessor directives
-    print_copyright();
     printf(
-        "------------------------------------------------------------------------------\n"
         "Preprocessor directives      Effect\n"
         "------------------------------------------------------------------------------\n"
         "/* ... */                    Comment out from /* to */\n\n"
@@ -186,7 +186,6 @@ void list_ppd() {
 
 void print_copyright() {
     printf(
-        "------------------------------------------------------------------------------\n"
         "VHDLproc / VHDL PreProcessor, version %s\n"
         "Copyright (c) 2020 Michael Riegert <michael@eowyn.net>\n"
         "Copyright (c) 2006-2020 Takashige Sugie <takashige@users.sourceforge.net>\n"
@@ -195,8 +194,7 @@ void print_copyright() {
         "Fork of vpp / VHDL PreProcessor, version 2.0.3d\n"
         "https://sourceforge.net/projects/vhdlpp/\n"
         "Copyright (c) 2006-2020 Takashige Sugie <takashige@users.sourceforge.net>\n"
-        "Licensed under General Public License version 2 or later\n"
-        "------------------------------------------------------------------------------\n\n",
+        "Licensed under General Public License version 2 or later\n",
         VERSION
     );
 }
