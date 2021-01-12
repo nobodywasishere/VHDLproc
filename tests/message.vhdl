@@ -1,1 +1,1 @@
-#message "This test was successful"
+`message This test was successful

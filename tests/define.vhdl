@@ -1,22 +1,33 @@
-#define TEST "hello"
+`define TEST "hello"
+`define HELLO fun
 
 TEST
 
 
-#define TEST2
+`define TEST2
 
-#ifdef TEST2
+`ifdef TEST2
+
+`ifndef TEST4
 
 TEST TEST TEST
 
-#else
+`else
+
+tsktstk
+
+`endif
+
+TEST
+
+`else
 
 TEST TEST no TEST
 
-#endif
+`endif
 
-#ifndef TEST3
+`ifndef TEST3
 
-TEST TEST TEST
+TEST TEST TEST HELLO
 
-#endif
+`endif

@@ -1,3 +1,6 @@
-#define TEST2
 
-#undef TEST2
+`undef TEST3
+
+TEST3
+
+TEST2

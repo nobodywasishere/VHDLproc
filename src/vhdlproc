@@ -1,0 +1,235 @@
+#!/usr/bin/env python
+
+import os, sys
+import random
+import string
+import argparse
+
+__version__ = "1.1.0"
+
+def randHandler(r):
+    i = r[0]
+    x = int(r[1:])
+    o = ""
+    if i == 'B':
+        for j in range(x):
+            o += str(random.randint(0,1))
+    elif i == 'D':
+        o = str(random.randint(0, 10**x-1)).zfill(x)
+    elif i == 'H':
+        for j in range(x):
+            o += str(random.choice(string.hexdigits)).upper()
+    elif i == 'A':
+        for j in range(x):
+            o += str(random.choice(string.ascii_letters)).upper()
+    else:
+        print('Error: Incorrect `rand directive', r)
+        exit(1)
+    return o
+
+parser = argparse.ArgumentParser(description=f"VHDLproc v{__version__} - VHDL Preprocessor")
+parser.add_argument('input', nargs='?', help='Input file')
+parser.add_argument('output', nargs='?', help='Output file (defaults to [filename]-out.vhdl), pass - to print to stdout')
+parser.add_argument('-D', '--define', action='append', metavar='LABEL=VALUE', help='Define a label as a given value')
+parser.add_argument('-l', '--listppd', action='store_true', help='Print preprocessing directives')
+parser.add_argument('-q', '--quiet', action='store_true', help='Dont save or print output')
+parser.add_argument('-v', action='store_true', help='Verbose output')
+parser.add_argument('--version', action='version', version=f"%(prog)s {__version__}")
+args = parser.parse_args()
+
+FONT_DEFAULT = "\x1b[0m"
+FONT_BOLD = "\x1b[1m"
+if args.listppd:
+    print(f'''Preprocessor Directives for VHDLproc v{__version__}
+
+    /* ... */               -   Comment out from /* to */
+
+    `include FILENAME       -   Include another file here
+
+    `define LABEL           -   Define LABEL for `ifdef and `ifndef
+
+    `define LABEL STRING    -   Replace LABEL by STRING; must be a single word
+
+    `rand LABEL FORMAT      -   Replace LABEL by generated random characters
+                                according to FORMAT. FORMAT has an alphabet
+                                for radix and a digit number for generating,
+                                The radix character can be set by 'B'(bin),
+                                'D'(dec), 'H'(hex) and 'A'(alphabet)
+
+    `undef LABEL            -   Undefine LABEL by `define and `rand
+
+    `ifdef LABEL            -   If LABEL is defined, then the following is valid
+                                until `else or `endif
+                                Can be nested
+
+    `ifndef LABEL           -   If LABEL is not defined, then following program
+                                is valid until `else or `endif
+                                Can be nested
+
+    `else                   -   Reverse condition for `ifdef and `ifndef
+
+    `endif                  -   Terminator for `ifdef, `ifndef and `else
+
+    `for LABEL              -   Duplicate program code until `endfor LABEL times
+                                Can be nested
+
+    `endfor                 -   Terminator for `for
+
+    `message STRING         -   Print STRING to the standard output stream
+    ''')
+    exit(0)
+elif args.input is None:
+    print("Error: Input file is required")
+    exit(1)
+
+# insert an '-out' just before the extension if no specific output file given
+if args.output is None and not args.quiet:
+    ext = os.path.splitext(args.input)
+    args.output = ''.join((ext[:-1][0], "-out" + ext[-1]))
+
+if args.v:
+    print("Input file:", args.input)
+    print("Output file:", args.output)
+
+try:
+    infile = open(args.input, 'r')
+    intext = infile.read().split('\n')[:-1]
+except Exception as e:
+    print(e)
+    exit(1)
+
+inpath = '/'.join(args.input.split('/')[:-1])
+if args.v: print("Inpath:", inpath + "/")
+
+# Append comment char to line when true
+commentflag = False
+ifstack = [False]
+forstack = []
+
+definitions = {}
+
+if args.define is not None:
+    for d in args.define:
+        if '=' in d:
+            definitions[d.split('=')[0]] = d.split('=')[1]
+        else:
+            definitions[d] = None
+iter = -1
+while(iter < len(intext) - 1):
+    iter = iter + 1
+    line = intext[iter].strip()
+
+    # Check if opening comment in line
+    if "/*" in line:
+        commentflag = True
+
+    if commentflag:
+        intext[iter] = '-- ' + intext[iter]
+
+    # Check if closing comment in line
+    if "*/" in line:
+        commentflag = False
+    elif commentflag:
+        continue
+
+    if len(line) < 1:
+        if args.v: print(iter, "Skipping empty line")
+        continue
+
+    # Check for preprocessor functions
+    if '`' == line[0]:
+        instr = line[1:].split(' ')
+        intext[iter] = '-- ' + intext[iter]
+        if instr[0] == 'include':
+            if args.v: print(iter, "Including", instr[1])
+            inclfile = open(inpath + "/" + instr[1].replace('"',''), 'r')
+            incltext = inclfile.read()
+            intext.insert(iter + 1, incltext)
+        elif instr[0] == 'define':
+            if len(instr) == 3:
+                if args.v: print(iter, "Defining", instr[1], "as", instr[2])
+                definitions[instr[1]] = instr[2]
+            elif len(instr) == 2:
+                if args.v: print(iter, "Defining", instr[1])
+                definitions[instr[1]] = None
+        elif instr[0] == 'rand':
+            rand = randHandler(instr[2])
+            if args.v: print(iter, "Defining", instr[1], "as", rand)
+            definitions[instr[1]] = rand
+        elif instr[0] == 'undef':
+            if instr[1] in definitions:
+                if args.v: print(iter, "Undefining", instr[1])
+                definitions.pop(instr[1])
+        elif instr[0] == 'ifdef':
+            if args.v: print(iter, "Pushing if stack")
+            if str(instr[1]) in definitions and not ifstack[-1]:
+                ifstack.append(False)
+            else:
+                ifstack.append(True)
+        elif instr[0] == 'ifndef':
+            if args.v: print(iter, "Pushing if stack")
+            if str(instr[1]) not in definitions and not ifstack[-1]:
+                ifstack.append(False)
+            else:
+                ifstack.append(True)
+        elif instr[0] == 'else':
+            if not ifstack[-2]:
+                if args.v: print(iter, "Elsing if stack")
+                ifstack[-1] = not ifstack[-1]
+        elif instr[0] == 'endif':
+            if args.v: print(iter, "Popping if stack")
+            ifstack.pop()
+        elif instr[0] == 'for':
+            if args.v: print(iter, "Pushing for stack")
+            forstack.append((iter, int(instr[1])))
+            pass
+        elif instr[0] == 'endfor':
+            incltext = ''
+            if args.v: print(iter, "Popping for stack")
+            pane = forstack.pop()
+            for j in range(pane[1] - 1):
+                if j != 0:
+                    incltext = incltext + '\n--\n' + '\n'.join(intext[pane[0]+1:iter])
+                else:
+                    incltext = incltext + '--\n' + '\n'.join(intext[pane[0]+1:iter])
+            intext.insert(iter, incltext)
+            pass
+        elif instr[0] == 'message':
+            print("Message:", ' '.join(instr[1:]))
+        else:
+            print("Unknown directive:", instr[0])
+
+    if args.v:
+        if ifstack != []: print(iter, "ifstack: ", ifstack)
+        if forstack != []: print(iter, "forstack:", forstack)
+
+    if ifstack[-1] and intext[iter].strip()[:2] != "--":
+        intext[iter] = '-- ' + intext[iter]
+
+    # Skip commented and preprocessor lines
+    if intext[iter].strip()[:2] == "--":
+        if args.v: print(iter, "Skipping commented/preproc line")
+        continue
+
+    # Replace defined words
+    for word in list(dict.fromkeys(line.split(' '))):
+        if word in definitions and definitions[word] is not None:
+            if args.v: print(iter, "Replacing", word, "with", definitions[word])
+            intext[iter] = intext[iter].replace(word, str(definitions[word]))
+
+if args.v: print(iter, "End of file")
+
+if forstack != []:
+    print("Error: mismatching for directives")
+    exit(1)
+
+if ifstack != [False]:
+    print("Error: mismatching if directives")
+    exit(1)
+
+if args.output == '-':
+    for line in intext[:]:
+        print(line)
+elif not args.quiet:
+    outfile = open(args.output, 'w')
+    outfile.write('\n'.join(intext))
