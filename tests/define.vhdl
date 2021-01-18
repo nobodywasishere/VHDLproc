@@ -10,7 +10,9 @@ TEST
 
 `ifndef TEST4
 
-TEST TEST TEST
+TEST TEST TEST'test
+
+"Hello there my name is TEST"
 
 `else
 
@@ -22,12 +24,16 @@ TEST
 
 `else
 
-TEST TEST no TEST
+(TEST TEST: no TEST)
 
 `endif
 
 `ifndef TEST3
 
-TEST TEST TEST HELLO
+TEST TEST TEST_TEST HELLO
 
 `endif
+
+`define meow_1 "hello there my name is al"
+
+meow_1

@@ -6,40 +6,55 @@ Recreation of `vpp` version 2.0.3d which is Copyright (c) 2006-2020 Takashige Su
 
 ## Build and Install
 
-From Linux, simply make `src/vhdlproc` executable by running `chmod +x src/vhdlproc`. Then the program can be run directly via `./src/vhdlproc`.
+From Linux, simply make `src/vhdlproc` executable by running `chmod +x src/vhdlproc`. Then the program can be run directly via `./src/vhdlproc`. Requires the Python libs `os`, `sys`, `random`, and `argparse`.
 
 ## Usage
 
 ### Command Line Options
 ```
-usage: vhdlproc [-h] [-D LABEL=VALUE] [-l] [-q] [-v] [--version] [input] [output]
+usage: vhdlproc [-h] [-D LABEL=VALUE] [-l] [-q] [-v] [--version] [--comment CHAR] [--directive CHAR]
+                [input] [output]
 
-VHDLproc v1.1.0 - VHDL Preprocessor
+VHDLproc v1.1.1 - VHDL Preprocessor
 
 positional arguments:
-  input                 Input file
-  output                Output file (defaults to [filename]-out.vhdl), pass - to print to stdout
+  input                 Input file (Pass - to read from stdin)
+  output                Output file (defaults to [filename]-out.vhdl) (pass - to print to stdout)
 
 optional arguments:
   -h, --help            show this help message and exit
   -D LABEL=VALUE, --define LABEL=VALUE
                         Define a label as a given value
   -l, --listppd         Print preprocessing directives
-  -q, --quiet           Dont save or print output
+  -q                    Quiet output
   -v                    Verbose output
   --version             show program's version number and exit
+  --comment CHAR        Character to comment out with (default: -- )
+  --directive CHAR      Character for preprocessor directives (default: ` )
 ```
 
+You can read from stdin, but it can only print to stdout. This can be then used to pipe to other programs.
+```
+$ cat tests/define.vhdl | ./src/vhdlproc -
+-- `define TEST "hello"
+-- `define HELLO fun
+
+"hello"
+...
+```
 
 ### Preprocessor Directives (what you put in your VHDL files)
 ```
 /* ... */               -   Comment out from /* to */
 
-`include FILENAME       -   Include another file here
+`include FILENAME       -   Include another file relative to
+                            the location of the source
 
 `define LABEL           -   Define LABEL for `ifdef and `ifndef
+                            Will replace even when LABEL attached to an attribute
+                            Will replace even when LABEL is within quotes
 
-`define LABEL STRING    -   Replace LABEL by STRING; must be a single word
+`define LABEL STRING    -   Replace LABEL by STRING, can be multiple words
 
 `rand LABEL FORMAT      -   Replace LABEL by generated random characters
                             according to FORMAT. FORMAT has an alphabet
@@ -69,6 +84,12 @@ optional arguments:
 
 `message STRING         -   Print STRING to the standard output stream
 ```
+
+The preprocessor character (default: \` ) can either be changed by the command line option `--directive CHAR` or by the environment variable `VHDLPROC_DIRECTIVE`. The command line option supersedes the environment variable, which supersedes the default.
+
+It's possible to use `#` as the preprocessor directive by passing in `--directive "#"` or by setting the environment variable `export VHDLPROC_DIRECTIVE="#"`.
+
+The comment character (default: -- ) can either be changed by the command line option `--comment CHAR` or by the environment variable `VHDLPROC_COMMENT`. The command line option supersedes the environment variable, which supersedes the default.
 
 ## Examples
 
@@ -200,6 +221,88 @@ spoon spoon
 FORK FORK
 
 -- `endfor
+```
+
+### Define
+
+Input:
+```
+`define TEST "hello"
+`define HELLO fun
+
+TEST
+
+`define TEST2
+
+`ifdef TEST2
+
+`ifndef TEST4
+
+TEST TEST TEST'test
+
+`else
+
+tsktstk
+
+`endif
+
+TEST
+
+`else
+
+(TEST TEST: no TEST)
+
+`endif
+
+`ifndef TEST3
+
+TEST TEST TEST_TEST HELLO
+
+`endif
+
+`define meow_1 "hello there my name is al"
+
+meow_1
+```
+
+output:
+```
+-- `define TEST "hello"
+-- `define HELLO fun
+
+"hello"
+
+-- `define TEST2
+
+-- `ifdef TEST2
+
+-- `ifndef TEST4
+
+"hello" "hello" "hello"'test
+
+-- `else
+
+-- tsktstk
+
+-- `endif
+
+"hello"
+
+-- `else
+
+-- (TEST TEST: no TEST)
+
+-- `endif
+
+-- `ifndef TEST3
+
+"hello" "hello" TEST_TEST fun
+
+-- `endif
+
+-- `define meow_1 "hello there my name is al"
+
+"hello there my name is al"
 ```
 
 ### Random definition

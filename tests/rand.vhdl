@@ -13,3 +13,7 @@ TEST3
 `rand TEST4 A50
 
 TEST4
+
+`rand testing B1
+
+testing

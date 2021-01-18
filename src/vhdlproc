@@ -5,12 +5,17 @@ import random
 import string
 import argparse
 
-__version__ = "1.1.0"
+__version__ = "1.1.1"
 
 def randHandler(r):
-    i = r[0]
-    x = int(r[1:])
-    o = ""
+    try:
+        i = r[0]
+        x = int(r[1:])
+        o = ""
+    except:
+        print(f"ERROR: Incorrect rand directive (line { iter + 1 })", file=sys.stderr)
+        exit(1)
+
     if i == 'B':
         for j in range(x):
             o += str(random.randint(0,1))
@@ -23,83 +28,143 @@ def randHandler(r):
         for j in range(x):
             o += str(random.choice(string.ascii_letters)).upper()
     else:
-        print('Error: Incorrect `rand directive', r)
+        print(f"ERROR: Incorrect rand directive (line { iter + 1 })", file=sys.stderr)
         exit(1)
     return o
 
+def splitLineIntoList(line):
+    out = []
+    curr = []
+    for char in line:
+        if char.isalnum() or char == "_":
+            curr.append(char)
+        else:
+            if curr == []:
+                out.append([char])
+            else:
+                out.append(curr)
+                out.append([char])
+                curr = []
+
+    if curr != []:
+        out.append(curr)
+
+    for i in range(len(out)):
+        out[i] = ''.join(out[i])
+
+    return out
+
 parser = argparse.ArgumentParser(description=f"VHDLproc v{__version__} - VHDL Preprocessor")
-parser.add_argument('input', nargs='?', help='Input file')
-parser.add_argument('output', nargs='?', help='Output file (defaults to [filename]-out.vhdl), pass - to print to stdout')
+parser.add_argument('input', nargs='?', help='Input file (Pass - to read from stdin)')
+parser.add_argument('output', nargs='?', help=' Output file (defaults to [filename]-out.vhdl) (pass - to print to stdout)')
 parser.add_argument('-D', '--define', action='append', metavar='LABEL=VALUE', help='Define a label as a given value')
 parser.add_argument('-l', '--listppd', action='store_true', help='Print preprocessing directives')
-parser.add_argument('-q', '--quiet', action='store_true', help='Dont save or print output')
+parser.add_argument('-q', action='store_true', help='Dont save or print output')
 parser.add_argument('-v', action='store_true', help='Verbose output')
 parser.add_argument('--version', action='version', version=f"%(prog)s {__version__}")
+parser.add_argument('--comment', metavar='CHAR', help='Character to comment out with (default: -- )')
+parser.add_argument('--directive', metavar='CHAR', help='Character for preprocessor directives (default: ` )')
 args = parser.parse_args()
 
-FONT_DEFAULT = "\x1b[0m"
-FONT_BOLD = "\x1b[1m"
+if args.directive is not None:
+    DIRECTIVE_CHAR = args.directive
+elif 'VHDLPROC_DIRECTIVE' in os.environ:
+    DIRECTIVE_CHAR = os.environ['VHDLPROC_DIRECTIVE']
+else:
+    DIRECTIVE_CHAR = "`"
+
+    if DIRECTIVE_CHAR == "":
+        print("ERROR: Empty directive char")
+        exit(1)
+
 if args.listppd:
     print(f'''Preprocessor Directives for VHDLproc v{__version__}
 
     /* ... */               -   Comment out from /* to */
 
-    `include FILENAME       -   Include another file here
+    {DIRECTIVE_CHAR}include FILENAME       -   Include another file relative to
+                                the location of the source
 
-    `define LABEL           -   Define LABEL for `ifdef and `ifndef
+    {DIRECTIVE_CHAR}define LABEL           -   Define LABEL for `ifdef and `ifndef
+                                Will replace even when LABEL attached to an attribute
 
-    `define LABEL STRING    -   Replace LABEL by STRING; must be a single word
+    {DIRECTIVE_CHAR}define LABEL STRING    -   Replace LABEL by STRING, can be multiple words
 
-    `rand LABEL FORMAT      -   Replace LABEL by generated random characters
+    {DIRECTIVE_CHAR}rand LABEL FORMAT      -   Replace LABEL by generated random characters
                                 according to FORMAT. FORMAT has an alphabet
                                 for radix and a digit number for generating,
                                 The radix character can be set by 'B'(bin),
                                 'D'(dec), 'H'(hex) and 'A'(alphabet)
 
-    `undef LABEL            -   Undefine LABEL by `define and `rand
+    {DIRECTIVE_CHAR}undef LABEL            -   Undefine LABEL by `define and `rand
 
-    `ifdef LABEL            -   If LABEL is defined, then the following is valid
+    {DIRECTIVE_CHAR}ifdef LABEL            -   If LABEL is defined, then the following is valid
                                 until `else or `endif
                                 Can be nested
 
-    `ifndef LABEL           -   If LABEL is not defined, then following program
+    {DIRECTIVE_CHAR}ifndef LABEL           -   If LABEL is not defined, then following program
                                 is valid until `else or `endif
                                 Can be nested
 
-    `else                   -   Reverse condition for `ifdef and `ifndef
+    {DIRECTIVE_CHAR}else                   -   Reverse condition for `ifdef and `ifndef
 
-    `endif                  -   Terminator for `ifdef, `ifndef and `else
+    {DIRECTIVE_CHAR}endif                  -   Terminator for `ifdef, `ifndef and `else
 
-    `for LABEL              -   Duplicate program code until `endfor LABEL times
+    {DIRECTIVE_CHAR}for LABEL              -   Duplicate program code until `endfor LABEL times
                                 Can be nested
 
-    `endfor                 -   Terminator for `for
+    {DIRECTIVE_CHAR}endfor                 -   Terminator for `for
 
-    `message STRING         -   Print STRING to the standard output stream
+    {DIRECTIVE_CHAR}message STRING         -   Print STRING to the standard output stream
     ''')
     exit(0)
+elif args.input == "-":
+    # args.q = True
+    pass
 elif args.input is None:
-    print("Error: Input file is required")
+    print("Error: Input file is required", file=sys.stderr)
     exit(1)
 
+if args.comment is not None:
+    COMMENT_CHAR = args.comment
+elif 'VHDLPROC_COMMENT' in os.environ:
+    COMMENT_CHAR = os.environ['VHDLPROC_COMMENT']
+else:
+    COMMENT_CHAR = "-- "
+
+if not args.q and COMMENT_CHAR != "-- ": print("Using comment char:", COMMENT_CHAR, file=sys.stderr)
+
+if not args.q and DIRECTIVE_CHAR != "`": print("Using directive char:", DIRECTIVE_CHAR, file=sys.stderr)
+
+
 # insert an '-out' just before the extension if no specific output file given
-if args.output is None and not args.quiet:
+if args.input == "-":
+    args.output = "-"
+elif args.output is None:
     ext = os.path.splitext(args.input)
     args.output = ''.join((ext[:-1][0], "-out" + ext[-1]))
 
-if args.v:
-    print("Input file:", args.input)
-    print("Output file:", args.output)
+if not args.q:
+    print("Input file:", args.input, file=sys.stderr)
+    print("Output file:", args.output, file=sys.stderr)
+
+if args.input == "-":
+    inpath = os.getcwd()
+else:
+    inpath = '/'.join(args.input.split('/')[:-1])
+
+if not args.q: print("Include path:", inpath + "/", file=sys.stderr)
 
 try:
-    infile = open(args.input, 'r')
-    intext = infile.read().split('\n')[:-1]
+    if args.input == "-":
+        intext = sys.stdin.read().split('\n')[:-1]
+    else:
+        infile = open(args.input, 'r')
+        intext = infile.read().split('\n')[:-1]
 except Exception as e:
-    print(e)
+    print(e, file=sys.stderr)
     exit(1)
 
-inpath = '/'.join(args.input.split('/')[:-1])
-if args.v: print("Inpath:", inpath + "/")
 
 # Append comment char to line when true
 commentflag = False
@@ -124,7 +189,7 @@ while(iter < len(intext) - 1):
         commentflag = True
 
     if commentflag:
-        intext[iter] = '-- ' + intext[iter]
+        intext[iter] = COMMENT_CHAR + intext[iter]
 
     # Check if closing comment in line
     if "*/" in line:
@@ -137,22 +202,26 @@ while(iter < len(intext) - 1):
         continue
 
     # Check for preprocessor functions
-    if '`' == line[0]:
-        instr = line[1:].split(' ')
-        intext[iter] = '-- ' + intext[iter]
+    if DIRECTIVE_CHAR == line[:len(DIRECTIVE_CHAR)]:
+        instr = line[len(DIRECTIVE_CHAR):].strip().split(' ')
+        if args.v: print(iter + 1, "Instruction:", ' '.join(instr))
+        intext[iter] = COMMENT_CHAR + intext[iter]
         if instr[0] == 'include':
             if args.v: print(iter, "Including", instr[1])
             inclfile = open(inpath + "/" + instr[1].replace('"',''), 'r')
             incltext = inclfile.read()
             intext.insert(iter + 1, incltext)
         elif instr[0] == 'define':
-            if len(instr) == 3:
-                if args.v: print(iter, "Defining", instr[1], "as", instr[2])
-                definitions[instr[1]] = instr[2]
+            if len(instr) >= 3:
+                if args.v: print(iter, "Defining", instr[1], "as", ' '.join(instr[2:]))
+                definitions[instr[1]] = ' '.join(instr[2:])
             elif len(instr) == 2:
                 if args.v: print(iter, "Defining", instr[1])
                 definitions[instr[1]] = None
         elif instr[0] == 'rand':
+            if len(instr) != 3:
+                print(f"ERROR: Incorrect rand directive (line { iter + 1 })")
+                exit(1)
             rand = randHandler(instr[2])
             if args.v: print(iter, "Defining", instr[1], "as", rand)
             definitions[instr[1]] = rand
@@ -189,9 +258,9 @@ while(iter < len(intext) - 1):
             pane = forstack.pop()
             for j in range(pane[1] - 1):
                 if j != 0:
-                    incltext = incltext + '\n--\n' + '\n'.join(intext[pane[0]+1:iter])
+                    incltext = incltext + '\n' + COMMENT_CHAR + '\n' + '\n'.join(intext[pane[0]+1:iter])
                 else:
-                    incltext = incltext + '--\n' + '\n'.join(intext[pane[0]+1:iter])
+                    incltext = incltext + COMMENT_CHAR + '\n' + '\n'.join(intext[pane[0]+1:iter])
             intext.insert(iter, incltext)
             pass
         elif instr[0] == 'message':
@@ -203,33 +272,37 @@ while(iter < len(intext) - 1):
         if ifstack != []: print(iter, "ifstack: ", ifstack)
         if forstack != []: print(iter, "forstack:", forstack)
 
-    if ifstack[-1] and intext[iter].strip()[:2] != "--":
-        intext[iter] = '-- ' + intext[iter]
+    if ifstack[-1] and intext[iter].strip()[:len(COMMENT_CHAR)] != COMMENT_CHAR:
+        intext[iter] = COMMENT_CHAR + intext[iter]
 
     # Skip commented and preprocessor lines
-    if intext[iter].strip()[:2] == "--":
+    if intext[iter].strip()[:len(COMMENT_CHAR)] == COMMENT_CHAR:
         if args.v: print(iter, "Skipping commented/preproc line")
         continue
 
     # Replace defined words
-    for word in list(dict.fromkeys(line.split(' '))):
+    words = splitLineIntoList(line)
+    for i in range(len(words)):
+        word = words[i]
         if word in definitions and definitions[word] is not None:
             if args.v: print(iter, "Replacing", word, "with", definitions[word])
-            intext[iter] = intext[iter].replace(word, str(definitions[word]))
+            words[i] = definitions[word]
+
+    intext[iter] = ''.join(words)
 
 if args.v: print(iter, "End of file")
 
 if forstack != []:
-    print("Error: mismatching for directives")
+    print("Error: mismatching for directives", file=sys.stderr)
     exit(1)
 
 if ifstack != [False]:
-    print("Error: mismatching if directives")
+    print("Error: mismatching if directives", file=sys.stderr)
     exit(1)
 
 if args.output == '-':
     for line in intext[:]:
         print(line)
-elif not args.quiet:
+elif not args.q:
     outfile = open(args.output, 'w')
     outfile.write('\n'.join(intext))
