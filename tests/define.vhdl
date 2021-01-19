@@ -1,8 +1,9 @@
 `define TEST "hello"
-`define HELLO fun
+    `define HELLO fun
 
-TEST
+"TEST __LINE__"
 
+__LINE__ __FILE__ __DATE__ __TIME__
 
 `define TEST2
 

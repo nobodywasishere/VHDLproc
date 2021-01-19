@@ -3,9 +3,10 @@
 import os, sys
 import random
 import string
+import datetime as dt
 import argparse
 
-__version__ = "1.1.1"
+__version__ = "1.1.2"
 
 def randHandler(r):
     try:
@@ -13,7 +14,7 @@ def randHandler(r):
         x = int(r[1:])
         o = ""
     except:
-        print(f"ERROR: Incorrect rand directive (line { iter + 1 })", file=sys.stderr)
+        print(f"Error: Incorrect rand directive (line { iter + 1 })", file=sys.stderr)
         exit(1)
 
     if i == 'B':
@@ -28,15 +29,25 @@ def randHandler(r):
         for j in range(x):
             o += str(random.choice(string.ascii_letters)).upper()
     else:
-        print(f"ERROR: Incorrect rand directive (line { iter + 1 })", file=sys.stderr)
+        print(f"Error: Incorrect rand directive (line { iter + 1 })", file=sys.stderr)
         exit(1)
     return o
 
 def splitLineIntoList(line):
+    if line is None:
+        return []
+    elif line == "":
+        return [""]
     out = []
     curr = []
+    quote = False
+    quote_ch = False
     for char in line:
-        if char.isalnum() or char == "_":
+        quote_ch = False
+        if char == '"' and not quote:
+            quote = True
+            quote_ch = True
+        if char.isalnum() or char == "_" or quote:
             curr.append(char)
         else:
             if curr == []:
@@ -45,6 +56,8 @@ def splitLineIntoList(line):
                 out.append(curr)
                 out.append([char])
                 curr = []
+        if char == '"' and quote and not quote_ch:
+            quote = False
 
     if curr != []:
         out.append(curr)
@@ -53,6 +66,14 @@ def splitLineIntoList(line):
         out[i] = ''.join(out[i])
 
     return out
+
+def definitionSubsitute(words, definitions):
+    for i in range(len(words)):
+        word = words[i]
+        if word in definitions and definitions[word] is not None:
+            if args.v: print(f"{iter:3}", "Replacing", word, "with", definitions[word])
+            words[i] = definitions[word]
+    return ''.join(words)
 
 parser = argparse.ArgumentParser(description=f"VHDLproc v{__version__} - VHDL Preprocessor")
 parser.add_argument('input', nargs='?', help='Input file (Pass - to read from stdin)')
@@ -72,9 +93,8 @@ elif 'VHDLPROC_DIRECTIVE' in os.environ:
     DIRECTIVE_CHAR = os.environ['VHDLPROC_DIRECTIVE']
 else:
     DIRECTIVE_CHAR = "`"
-
     if DIRECTIVE_CHAR == "":
-        print("ERROR: Empty directive char")
+        print("Error: Empty directive char", file=sys.stderr)
         exit(1)
 
 if args.listppd:
@@ -86,9 +106,10 @@ if args.listppd:
                                 the location of the source
 
     {DIRECTIVE_CHAR}define LABEL           -   Define LABEL for `ifdef and `ifndef
-                                Will replace even when LABEL attached to an attribute
 
     {DIRECTIVE_CHAR}define LABEL STRING    -   Replace LABEL by STRING, can be multiple words
+                                Will replace ignoring single quotes and attributes ('', ')
+                                Will not replace within double quotes ("")
 
     {DIRECTIVE_CHAR}rand LABEL FORMAT      -   Replace LABEL by generated random characters
                                 according to FORMAT. FORMAT has an alphabet
@@ -110,12 +131,15 @@ if args.listppd:
 
     {DIRECTIVE_CHAR}endif                  -   Terminator for `ifdef, `ifndef and `else
 
-    {DIRECTIVE_CHAR}for LABEL              -   Duplicate program code until `endfor LABEL times
+    {DIRECTIVE_CHAR}for INT                -   Duplicate program code until `endfor INT times
                                 Can be nested
 
     {DIRECTIVE_CHAR}endfor                 -   Terminator for `for
 
     {DIRECTIVE_CHAR}message STRING         -   Print STRING to the standard output stream
+
+    {DIRECTIVE_CHAR}error STRING           -   Print STRING to standard error output stream
+                                Will force close VHDLproc without saving
     ''')
     exit(0)
 elif args.input == "-":
@@ -173,124 +197,143 @@ forstack = []
 
 definitions = {}
 
+if args.input != "-":
+    definitions["__FILE__"] = "\"" + os.path.abspath(args.input) + "\""
+else:
+    definitions["__FILE__"] = "\"STDIN\""
+definitions["__DATE__"] = "\"" + dt.datetime.now().strftime("%b %d %Y") + "\""
+definitions["__TIME__"] = "\"" + dt.datetime.now().strftime("%H:%M:%S") + "\""
+
 if args.define is not None:
     for d in args.define:
         if '=' in d:
             definitions[d.split('=')[0]] = d.split('=')[1]
         else:
             definitions[d] = None
-iter = -1
-while(iter < len(intext) - 1):
-    iter = iter + 1
+
+for iter in range(len(intext)):
     line = intext[iter].strip()
+    definitions["__LINE__"] = str(iter + 1)
+
+    if args.v: print(f"{iter:3}", ":", line)
 
     # Check if opening comment in line
-    if "/*" in line:
+    if (len(line) > 0 and line.strip()[:len(DIRECTIVE_CHAR)] != DIRECTIVE_CHAR) and "/*" in splitLineIntoList(line):
         commentflag = True
 
     if commentflag:
         intext[iter] = COMMENT_CHAR + intext[iter]
 
     # Check if closing comment in line
-    if "*/" in line:
+    if (len(line) > 0 and line.strip()[:len(DIRECTIVE_CHAR)] != DIRECTIVE_CHAR) and "*/" in splitLineIntoList(line):
         commentflag = False
     elif commentflag:
         continue
 
     if len(line) < 1:
-        if args.v: print(iter, "Skipping empty line")
+        if args.v: print(f"{iter:3}", "Skipping empty line")
         continue
 
     # Check for preprocessor functions
     if DIRECTIVE_CHAR == line[:len(DIRECTIVE_CHAR)]:
         instr = line[len(DIRECTIVE_CHAR):].strip().split(' ')
-        if args.v: print(iter + 1, "Instruction:", ' '.join(instr))
         intext[iter] = COMMENT_CHAR + intext[iter]
+        if args.v: print(f"{iter:3}", "Instruction:", ' '.join(instr))
+
         if instr[0] == 'include':
-            if args.v: print(iter, "Including", instr[1])
+            if args.v: print(f"{iter:3}", "Including", instr[1])
             inclfile = open(inpath + "/" + instr[1].replace('"',''), 'r')
-            incltext = inclfile.read()
-            intext.insert(iter + 1, incltext)
+            incltext = COMMENT_CHAR + line + '\n' + inclfile.read()
+            # replace the line instead of inserting to not mess with the number of lines
+            intext[iter] = incltext
+
         elif instr[0] == 'define':
             if len(instr) >= 3:
-                if args.v: print(iter, "Defining", instr[1], "as", ' '.join(instr[2:]))
+                if args.v: print(f"{iter:3}", "Defining", instr[1], "as", ' '.join(instr[2:]))
                 definitions[instr[1]] = ' '.join(instr[2:])
             elif len(instr) == 2:
-                if args.v: print(iter, "Defining", instr[1])
+                if args.v: print(f"{iter:3}", "Defining", instr[1])
                 definitions[instr[1]] = None
+
         elif instr[0] == 'rand':
             if len(instr) != 3:
-                print(f"ERROR: Incorrect rand directive (line { iter + 1 })")
+                print(f"Error: Incorrect rand directive (line { iter + 1 })")
                 exit(1)
             rand = randHandler(instr[2])
-            if args.v: print(iter, "Defining", instr[1], "as", rand)
+            if args.v: print(f"{iter:3}", "Defining", instr[1], "as", rand)
             definitions[instr[1]] = rand
+
         elif instr[0] == 'undef':
             if instr[1] in definitions:
-                if args.v: print(iter, "Undefining", instr[1])
+                if args.v: print(f"{iter:3}", "Undefining", instr[1])
                 definitions.pop(instr[1])
+
         elif instr[0] == 'ifdef':
-            if args.v: print(iter, "Pushing if stack")
+            if args.v: print(f"{iter:3}", "Pushing if stack")
             if str(instr[1]) in definitions and not ifstack[-1]:
                 ifstack.append(False)
             else:
                 ifstack.append(True)
+
         elif instr[0] == 'ifndef':
-            if args.v: print(iter, "Pushing if stack")
+            if args.v: print(f"{iter:3}", "Pushing if stack")
             if str(instr[1]) not in definitions and not ifstack[-1]:
                 ifstack.append(False)
             else:
                 ifstack.append(True)
+
         elif instr[0] == 'else':
             if not ifstack[-2]:
-                if args.v: print(iter, "Elsing if stack")
+                if args.v: print(f"{iter:3}", "Elsing if stack")
                 ifstack[-1] = not ifstack[-1]
+
         elif instr[0] == 'endif':
-            if args.v: print(iter, "Popping if stack")
+            if args.v: print(f"{iter:3}", "Popping if stack")
             ifstack.pop()
+
         elif instr[0] == 'for':
-            if args.v: print(iter, "Pushing for stack")
+            if args.v: print(f"{iter:3}", "Pushing for stack")
             forstack.append((iter, int(instr[1])))
-            pass
+
         elif instr[0] == 'endfor':
             incltext = ''
-            if args.v: print(iter, "Popping for stack")
+            if args.v: print(f"{iter:3}", "Popping for stack")
             pane = forstack.pop()
             for j in range(pane[1] - 1):
-                if j != 0:
-                    incltext = incltext + '\n' + COMMENT_CHAR + '\n' + '\n'.join(intext[pane[0]+1:iter])
-                else:
-                    incltext = incltext + COMMENT_CHAR + '\n' + '\n'.join(intext[pane[0]+1:iter])
-            intext.insert(iter, incltext)
-            pass
+                incltext = incltext + COMMENT_CHAR + '\n' + '\n'.join(intext[pane[0]+1:iter]) + '\n'
+            incltext = incltext + COMMENT_CHAR + "`endfor"
+            # replace the line instead of inserting to not mess with the number of lines
+            intext[iter] = incltext
+
         elif instr[0] == 'message':
             print("Message:", ' '.join(instr[1:]))
+
+        elif instr[0] == 'error':
+            print("Error:", ' '.join(instr[1:]), file=sys.stderr)
+            exit(1)
+
         else:
             print("Unknown directive:", instr[0])
 
+    # print if/for stacks if not default
     if args.v:
-        if ifstack != []: print(iter, "ifstack: ", ifstack)
-        if forstack != []: print(iter, "forstack:", forstack)
+        if ifstack != [False]: print(f"{iter:3}", "ifstack: ", ifstack)
+        if forstack != []: print(f"{iter:3}", "forstack:", forstack)
 
+    # comment out lines per the if instructions
     if ifstack[-1] and intext[iter].strip()[:len(COMMENT_CHAR)] != COMMENT_CHAR:
         intext[iter] = COMMENT_CHAR + intext[iter]
 
     # Skip commented and preprocessor lines
-    if intext[iter].strip()[:len(COMMENT_CHAR)] == COMMENT_CHAR:
-        if args.v: print(iter, "Skipping commented/preproc line")
+    if intext[iter].strip()[:len(COMMENT_CHAR)] == COMMENT_CHAR or intext[iter].strip()[:len(DIRECTIVE_CHAR)] == DIRECTIVE_CHAR:
+        if args.v: print(f"{iter:3}", "Skipping commented/preproc line")
         continue
 
     # Replace defined words
     words = splitLineIntoList(line)
-    for i in range(len(words)):
-        word = words[i]
-        if word in definitions and definitions[word] is not None:
-            if args.v: print(iter, "Replacing", word, "with", definitions[word])
-            words[i] = definitions[word]
+    intext[iter] = definitionSubsitute(words, definitions)
 
-    intext[iter] = ''.join(words)
-
-if args.v: print(iter, "End of file")
+if args.v: print(f"{iter:3}", "End of file")
 
 if forstack != []:
     print("Error: mismatching for directives", file=sys.stderr)
