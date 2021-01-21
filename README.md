@@ -4,6 +4,8 @@ VHDLproc is a simple command line VHDL preprocessor with C-like preprocessor fun
 
 Recreation of `vpp` version 2.0.3d which is Copyright (c) 2006-2020 Takashige Sugie <takashige@users.sourceforge.net> and licensed under GPL version 2 or later. The latest version of vpp is available [here](https://sourceforge.net/projects/vhdlpp/).
 
+Note: This does not follow the conditional analysis spec documented in VHDL-2019.
+
 ## Build and Install
 
 From Linux, simply make `src/vhdlproc` executable by running `chmod +x src/vhdlproc`. Then the program can be run directly via `./src/vhdlproc`. Requires the Python libs `os`, `sys`, `random`, `datetime`, and `argparse`.
