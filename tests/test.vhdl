@@ -5,6 +5,6 @@ constant hello : integer := 2008
 constant hello : integer := 2001
 `end if
 
-`if TOOL_NAME != "VHDLproc" then
+`if TOOL_NAME /= "VHDLproc" then
 `error "Unsupported tool"
 `end if

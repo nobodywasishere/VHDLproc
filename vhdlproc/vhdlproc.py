@@ -1,17 +1,16 @@
 #!/usr/bin/env python
 
 import os, sys
-import random
-import string
-import datetime as dt
 import argparse
 import logging
 
 logger = logging.getLogger(__name__)
 
+__version__ = "1.2.0"
+
 class VHDLproc:
     __tool_name    = "VHDLproc"
-    __version      = "1.2.0"
+    __version      = __version__
     __directives   = ['`warning', '`error', '`if', '`elsif', '`else', '`end', '`include']
     __comment_char = "-- "
 
@@ -74,10 +73,10 @@ class VHDLproc:
                 elif directive[0] == '`if':
                     if directive[-1] != "then":
                         raise Exception(f'VHDLproc: Line {line_i+1}: `if directive requires a then')
-                    ifstack.append(self.__eval(directive[1:-1], identifiers))
+                    ifstack.append(not self.__eval(directive[1:-1], identifiers))
 
                 elif directive[0] == '`elsif':
-                    if not ifstack[-2] and self.__eval(directive[1:-1], identifiers):
+                    if not ifstack[-2] and not self.__eval(directive[1:-1], identifiers):
                         ifstack[-1] = not ifstack[-1]
 
                 elif directive[0] == '`else':
@@ -87,6 +86,9 @@ class VHDLproc:
                 elif directive[0] == '`end':
                     ifstack.pop()
 
+                # open file and append source code at this location
+                # @todo Source file include location
+                # @body Include from the source files local path instead of a path from where the program is executed 
                 elif directive[0] == '`include':
                     filename = " ".join(directive[1:]).replace('"','').replace("'","")
                     include = []
@@ -95,19 +97,27 @@ class VHDLproc:
                     code = code[:line_i+1] + include + code[line_i+1:]
                     pass
 
+            # don't comment out lines that are already commented out
             if ifstack[-1] and code[line_i].strip()[:2] != "--":
                 code[line_i] = self.__comment_char + code[line_i]
 
-        if len(ifstack) != 1:
+        if len(ifstack) > 1:
             raise Exception(f"VHDLproc: Line {line_i+1}: Missing `end [ if ]")
 
         return '\n'.join(code)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=f"VHDLproc - VHDL Preprocessor")
-    parser.add_argument('-i', nargs='?', help='Input file (Omit to read from stdin)')
-    parser.add_argument('-o', nargs='?', help=' Output file (Omit to print to stdout)')
+    parser = argparse.ArgumentParser(description=f"VHDLproc v{__version__} - VHDL Preprocessor")
+    parser.add_argument('-i', help='Input file (Omit to read from stdin)')
+    parser.add_argument('-o', help='Output file (Omit to print to stdout)')
+    parser.add_argument('-D', action="append", metavar="IDENTIFIER=value", help='Specify identifiers for conditional compilation, ex. DEBUG_LEVEL=2')
     args = parser.parse_args()
+
+    identifiers = {}
+
+    if args.D:
+        for id in args.D:
+            identifiers[id.split('=')[0]] = str(id.split('=')[1])
 
     code = []
     if args.i:
@@ -118,7 +128,7 @@ if __name__ == "__main__":
             code.append(line.rstrip('\n'))
 
     proc = VHDLproc()
-    parsed_code = proc.parse(code)
+    parsed_code = proc.parse(code, identifiers=identifiers)
 
     if args.o:
         open(args.o, 'w+').write(parsed_code)
