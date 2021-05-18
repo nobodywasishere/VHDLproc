@@ -1,3 +1,1 @@
-`include "include-to.vhdl"
-
-this is a test
+`include '../tests/include-to.vhdl'
