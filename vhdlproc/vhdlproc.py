@@ -4,6 +4,8 @@ import os, sys
 import argparse
 import logging
 
+from infix import *
+
 logger = logging.getLogger(__name__)
 
 __version__ = "1.2.0"
@@ -15,10 +17,20 @@ class VHDLproc:
     __comment_char = "-- "
 
     def __eval(self, statement, identifiers):
+
         statement = ' '.join(statement)
-        statement = statement.replace(' = ',' == ')
-        statement = statement.replace(' /= ',' != ')
+
+        print(f'VHDLproc: Evaluating statement {statement}')
+
         statement = statement.lower()
+
+        # using truediv as it has higher precedence than bitwise or
+        # not using native python == as it has lower precedence than 
+        # bitwise or
+        statement = statement.replace(   ' = ',  ' /eq/ ')
+        statement = statement.replace(  ' /= ', ' /neq/ ')
+        statement = statement.replace( ' xor ', ' |xor| ')
+        statement = statement.replace(' xnor ',' |xnor| ')
 
         for id in identifiers:
             locals()[id.lower()] = identifiers[id].lower()
