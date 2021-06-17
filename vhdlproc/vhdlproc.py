@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import os, sys
+import shlex
 import argparse
 import logging
 
@@ -60,9 +61,16 @@ class VHDLproc:
                 continue
 
             if '`' == line.strip()[0]: # if this line is a directive
-                directive = line.strip().split(' ') # remove blank space and split words into a list
+
+                # https://stackoverflow.com/a/79985
+                # remove blank space and split words into a list
+                # don't separate quotes
+                directive = shlex.split(line.strip(), posix=False)
                 code[line_i] = self.__comment_char + code[line_i]
 
+                directive[0] = directive[0].lower()
+
+                if not ifstack[-1]:
                 # if it's not a supported directive
                 if directive[0] not in self.__directives:
                     raise Exception(f"VHDLproc: Line {line_i+1}: Unknown directive: {line.strip().split(' ')[0]}")
@@ -71,14 +79,14 @@ class VHDLproc:
                 elif directive[0] == '`warning' and not ifstack[-1]:
                     if len(directive) < 2:
                         raise Exception(f'VHDLproc: Line {line_i+1}: `warning directive requires a message')
-                    warning_message = " ".join(directive[1:]).replace('"','').replace("'","")
+                        warning_message = directive[1].replace('"','').replace("'","")
                     logger.warning(f'VHDLproc: Line {line_i+1}: Warning: {warning_message}')
 
                 # print error messages if not commented out
                 elif directive[0] == '`error' and not ifstack[-1]:
                     if len(directive) < 2:
                         raise Exception(f'VHDLproc: Line {line_i+1}: `error directive requires a message')
-                    error_message = " ".join(directive[1:]).replace('"','').replace("'","")
+                        error_message = directive[1].replace('"','').replace("'","")
                     logger.error(f'VHDLproc: Line {line_i+1}: Error: {error_message}')
                     exit(1)
 
