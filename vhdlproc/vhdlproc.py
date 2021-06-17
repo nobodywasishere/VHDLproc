@@ -71,26 +71,36 @@ class VHDLproc:
                 directive[0] = directive[0].lower()
 
                 if not ifstack[-1]:
-                # if it's not a supported directive
-                if directive[0] not in self.__directives:
-                    raise Exception(f"VHDLproc: Line {line_i+1}: Unknown directive: {line.strip().split(' ')[0]}")
+                    # if it's not a supported directive
+                    if directive[0] not in self.__directives:
+                        raise Exception(f"VHDLproc: Line {line_i+1}: Unknown directive: {line.strip().split(' ')[0]}")
 
-                # print warning messages if not commented out
-                elif directive[0] == '`warning' and not ifstack[-1]:
-                    if len(directive) < 2:
-                        raise Exception(f'VHDLproc: Line {line_i+1}: `warning directive requires a message')
+                    # print warning messages if not commented out
+                    elif directive[0] == '`warning' and not ifstack[-1]:
+                        if len(directive) < 2:
+                            raise Exception(f'VHDLproc: Line {line_i+1}: `warning directive requires a message')
                         warning_message = directive[1].replace('"','').replace("'","")
-                    logger.warning(f'VHDLproc: Line {line_i+1}: Warning: {warning_message}')
+                        logger.warning(f'VHDLproc: Line {line_i+1}: Warning: {warning_message}')
 
-                # print error messages if not commented out
-                elif directive[0] == '`error' and not ifstack[-1]:
-                    if len(directive) < 2:
-                        raise Exception(f'VHDLproc: Line {line_i+1}: `error directive requires a message')
+                    # print error messages if not commented out
+                    elif directive[0] == '`error' and not ifstack[-1]:
+                        if len(directive) < 2:
+                            raise Exception(f'VHDLproc: Line {line_i+1}: `error directive requires a message')
                         error_message = directive[1].replace('"','').replace("'","")
-                    logger.error(f'VHDLproc: Line {line_i+1}: Error: {error_message}')
-                    exit(1)
+                        logger.error(f'VHDLproc: Line {line_i+1}: Error: {error_message}')
+                        exit(1)
 
-                elif directive[0] == '`if':
+                    # open file and append source code at this location
+                    # @todo Source file include location
+                    # @body Include from the source files local path instead of a path from where the program is executed
+                    elif directive[0] == '`include':
+                        filename = " ".join(directive[1:]).replace('"','').replace("'","")
+                        include = []
+                        for incl_line in open(filename):
+                            include.append(incl_line.rstrip('\n'))
+                        code = code[:line_i+1] + include + code[line_i+1:]
+
+                if directive[0] == '`if':
                     if directive[-1] != "then":
                         raise Exception(f'VHDLproc: Line {line_i+1}: `if directive requires a then')
                     ifstack.append(not self.__eval(directive[1:-1], identifiers))
@@ -105,17 +115,6 @@ class VHDLproc:
 
                 elif directive[0] == '`end':
                     ifstack.pop()
-
-                # open file and append source code at this location
-                # @todo Source file include location
-                # @body Include from the source files local path instead of a path from where the program is executed 
-                elif directive[0] == '`include':
-                    filename = " ".join(directive[1:]).replace('"','').replace("'","")
-                    include = []
-                    for incl_line in open(filename):
-                        include.append(incl_line.rstrip('\n'))
-                    code = code[:line_i+1] + include + code[line_i+1:]
-                    pass
 
             # don't comment out lines that are already commented out
             if ifstack[-1] and code[line_i].strip()[:2] != "--":
