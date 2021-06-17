@@ -5,6 +5,7 @@ VHDLproc is a simple command line VHDL preprocessor written in Python following 
 ## Usage
 
 ### Command Line Options
+
 ```
 usage: vhdlproc.py [-h] [-i I] [-o O] [-D IDENTIFIER=value]
 
@@ -18,19 +19,18 @@ optional arguments:
 ```
 
 You can read from stdin or a file, and print to stdout or another file.
-```
-$ cat tests/define.vhdl | ./src/vhdlproc -
--- `define TEST "hello"
--- `define HELLO fun
 
-"hello"
+```
+$ cat tests/define.vhdl | python vhdlproc/vhdlproc.py
+`if VHDL_VERSION = "2008" then
+...
+`end if
 ...
 ```
 
 ### Preprocessor Directives (what you put in your VHDL files)
-```
-/* ... */               -   Comment out from /* to */
 
+```
 `include FILENAME       -   Include another file relative to
                             the location of the source
 
@@ -55,11 +55,13 @@ More examples included under `tests/`.
 ### Include File
 
 Input:
+
 ```
 `include "include-to.vhdl"
 ```
 
 include-to.vhdl:
+
 ```
 component pll is
     port (
@@ -71,6 +73,7 @@ end component;
 ```
 
 Output:
+
 ```
 -- `include "include-to.vhdl"
 component pll is
