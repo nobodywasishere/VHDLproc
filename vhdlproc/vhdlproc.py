@@ -21,7 +21,7 @@ class VHDLproc:
 
         statement = ' '.join(statement)
 
-        print(f'VHDLproc: Evaluating statement {statement}')
+        # print(f'VHDLproc: Evaluating statement {statement}')
 
         statement = statement.lower()
 
