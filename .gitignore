@@ -1,1 +1,2 @@
 tests/*-out.vhdl
+__pycache__
