@@ -76,7 +76,7 @@ class VHDLproc:
                     ifstack.append(not self.__eval(directive[1:-1], identifiers))
 
                 elif directive[0] == '`elsif':
-                    if not ifstack[-2] and not self.__eval(directive[1:-1], identifiers):
+                    if not ifstack[-2] and self.__eval(directive[1:-1], identifiers):
                         ifstack[-1] = not ifstack[-1]
 
                 elif directive[0] == '`else':
