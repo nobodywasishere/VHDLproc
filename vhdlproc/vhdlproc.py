@@ -10,12 +10,12 @@ import test
 
 logger = logging.getLogger(__name__)
 
-__version__ = "1.2.0"
+__version__ = "2.0"
 
 class VHDLproc:
     __tool_name    = "VHDLproc"
     __version      = __version__
-    __directives   = ['`warning', '`error', '`if', '`elsif', '`else', '`end', '`include']
+    __directives   = ['`warning', '`error', '`if', '`elsif', '`else', '`end', '`include', '`define']
     __comment_char = "-- "
 
     def __eval(self, statement, identifiers):
@@ -52,7 +52,7 @@ class VHDLproc:
         statement = statement.replace(' xnor ',' |l_xnor| ')
 
         for id in identifiers:
-            locals()[id.lower()] = identifiers[id].lower()
+            locals()[id] = identifiers[id]
 
         # print(f'Evaluating statement {statement}: {eval(statement)}')
 
@@ -78,6 +78,13 @@ class VHDLproc:
             identifiers['TOOL_VENDOR']  = ""
         if 'TOOL_EDITION' not in identifiers:
             identifiers['TOOL_EDITION'] = ""
+
+        temp_ids = {}
+
+        for id in identifiers:
+            temp_ids[id.lower()] = identifiers[id].lower()
+
+        identifiers = temp_ids
 
         ifstack = [[True, False]]
         line_i = -1
@@ -110,24 +117,29 @@ class VHDLproc:
                     elif directive[0] == '`warning':
                         if len(directive) < 2:
                             raise Exception(f'VHDLproc: Line {line_i+1}: `warning directive requires a message')
-                        warning_message = directive[1].replace('"','').replace("'","")
+                        warning_message = directive[1][1:-1]
                         logger.warning(f'VHDLproc: Warning: Line {line_i+1}: {warning_message}')
 
                     # print error messages if not commented out
                     elif directive[0] == '`error':
                         if len(directive) < 2:
                             raise Exception(f'VHDLproc: Line {line_i+1}: `error directive requires a message')
-                        error_message = directive[1].replace('"','').replace("'","")
+                        error_message = directive[1][1:-1]
                         logger.error(f'VHDLproc: Line {line_i+1}: Error: {error_message}')
                         exit(1)
 
                     # open file and append source code at this location
                     elif directive[0] == '`include':
-                        filename = include_path + " ".join(directive[1:]).replace('"','').replace("'","")
+                        filename = include_path + " ".join(directive[1:])[1:-1]
                         include = []
                         for incl_line in open(filename):
                             include.append(incl_line.rstrip('\n'))
                         code = code[:line_i+1] + include + code[line_i+1:]
+
+                    elif directive[0] == '`define':
+                        if len(directive) != 3:
+                            raise Exception(f'VHDLproc: Line {line_i+1}: `error directive requires a label and value')
+                        identifiers[directive[1].lower()] = directive[2].lower()[1:-1]
 
                 if directive[0] == '`if':
                     if directive[-1] != "then":
@@ -139,17 +151,13 @@ class VHDLproc:
                         ifstack.append([False, True])
 
                 elif directive[0] == '`elsif':
-                    # if not ifstack[-2][0] and ifstack[-1][0] and not ifstack[-1][1]:
-                    #     resp = self.__eval(directive[1:-1], identifiers)
-                    #     if resp:
-                    #         ifstack[-1][0] = not ifstack[-1][0]
-                    #     ifstack[-1][1] = ifstack[-1][1] or resp
+                    if directive[-1] != "then":
+                        raise Exception(f'VHDLproc: Line {line_i+1}: `elsif directive requires a then')
                     resp = self.__eval(directive[1:-1], identifiers)
                     ifstack[-1][0] = not ifstack[-1][1] and resp
                     ifstack[-1][1] = ifstack[-1][1] or resp
 
                 elif directive[0] == '`else':
-                    # if not ifstack[-2][0] and not ifstack[-1][1]:
                     if ifstack[-2][0]:
                         ifstack[-1][0] = not ifstack[-1][1]
 

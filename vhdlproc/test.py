@@ -44,56 +44,56 @@ def test_and():
     test_file = os.path.dirname(__file__) + '/../tests/and.vhdl'
     passed = True
 
-    print("\n  == a = 'a' and b = 'b' ==")
+    print('\n  == a = "a" and b = "b" ==')
     try:
-        parsed = proc.parse_file(test_file, identifiers={'a': 'a', 'b': 'b'})
+        parsed = proc.parse_file(test_file, identifiers={"a": "a", "b": "b"})
     except Exception as e:
         print(e)
         print('  Failed')
         passed = passed and False
-    if "a = 'a' and b = 'b'" in parsed.split('\n'):
+    if 'a = "a" and b = "b"' in parsed.split('\n'):
         print("  Passed")
         passed = passed and True
     else:
         print('  Failed')
         passed = passed and False
 
-    print("\n  == a /= 'a' and b = 'b' ==")
+    print('\n  == a /= "a" and b = "b" ==')
     try:
-        parsed = proc.parse_file(test_file, identifiers={'a': 'c', 'b': 'b'})
+        parsed = proc.parse_file(test_file, identifiers={"a": "c", "b": "b"})
     except Exception as e:
         print(e)
         print('  Failed')
         passed = passed and False
-    if "a /= 'a' and b = 'b'" in parsed.split('\n'):
+    if 'a /= "a" and b = "b"' in parsed.split('\n'):
         print("  Passed")
         passed = passed and True
     else:
         print('  Failed')
         passed = passed and False
 
-    print("\n  == a = 'a' and b /= 'b' ==")
+    print('\n  == a = "a" and b /= "b" ==')
     try:
-        parsed = proc.parse_file(test_file, identifiers={'a': 'a', 'b': 'c'})
+        parsed = proc.parse_file(test_file, identifiers={"a": "a", "b": 'c'})
     except Exception as e:
         print(e)
         print('  Failed')
         passed = passed and False
-    if "a = 'a' and b /= 'b'" in parsed.split('\n'):
+    if 'a = "a" and b /= "b"' in parsed.split('\n'):
         print("  Passed")
         passed = passed and True
     else:
         print('  Failed')
         passed = passed and False
 
-    print("\n  == a /= 'a' and b /= 'b' ==")
+    print('\n  == a /= "a" and b /= "b" ==')
     try:
-        parsed = proc.parse_file(test_file, identifiers={'a': 'c', 'b': 'c'})
+        parsed = proc.parse_file(test_file, identifiers={"a": 'c', "b": 'c'})
     except Exception as e:
         print(e)
         print('  Failed')
         passed = passed and False
-    if "a /= 'a' and b /= 'b'" in parsed.split('\n'):
+    if 'a /= "a" and b /= "b"' in parsed.split('\n'):
         print("  Passed")
         passed = passed and True
     else:
@@ -108,9 +108,9 @@ def test_nest():
     test_file = os.path.dirname(__file__) + '/../tests/nest.vhdl'
     passed = True
 
-    print("\n  == a = 'a' and b = 'b' ==")
+    print('\n  == a = "a" and b = "b" ==')
     try:
-        parsed = proc.parse_file(test_file, identifiers={'a': 'a', 'b': 'b'})
+        parsed = proc.parse_file(test_file, identifiers={"a": "a", "b": "b"})
     except Exception as e:
         print(e)
         print('  Failed')
@@ -122,9 +122,9 @@ def test_nest():
         print('  Failed')
         passed = passed and False
 
-    print("\n  == a /= 'a' and b = 'b' ==")
+    print('\n  == a /= "a" and b = "b" ==')
     try:
-        parsed = proc.parse_file(test_file, identifiers={'a': 'c', 'b': 'b'})
+        parsed = proc.parse_file(test_file, identifiers={"a": 'c', "b": "b"})
     except Exception as e:
         print(e)
         print('  Failed')
@@ -136,9 +136,9 @@ def test_nest():
         print('  Failed')
         passed = passed and False
 
-    print("\n  == a = 'a' and b /= 'b' ==")
+    print('\n  == a = "a" and b /= "b" ==')
     try:
-        parsed = proc.parse_file(test_file, identifiers={'a': 'a', 'b': 'c'})
+        parsed = proc.parse_file(test_file, identifiers={"a": "a", "b": 'c'})
     except Exception as e:
         print(e)
         print('  Failed')
@@ -150,9 +150,9 @@ def test_nest():
         print('  Failed')
         passed = passed and False
 
-    print("\n  == a /= 'a' and b /= 'b' ==")
+    print('\n  == a /= "a" and b /= "b" ==')
     try:
-        parsed = proc.parse_file(test_file, identifiers={'a': 'c', 'b': 'c'})
+        parsed = proc.parse_file(test_file, identifiers={"a": 'c', "b": 'c'})
     except Exception as e:
         print(e)
         print('  Failed')
