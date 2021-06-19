@@ -5,3 +5,10 @@ component pll is
         clk_locked : out std_logic
     );
 end component;
+`if include_file = "false" then
+`error "Failed"
+`else
+`warning "Passed"
+`end
+
+`define passed "failed"

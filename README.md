@@ -33,7 +33,7 @@ $ cat tests/define.vhdl | python vhdlproc/vhdlproc.py
 Parse files:
 
 ```python
-import VHDLproc
+from vhdlproc import VHDLproc
 
 processor = VHDLproc()
 
@@ -45,7 +45,7 @@ parsed_text = processor.parse_file("path/to/file.vhdl", identifiers=identifiers)
 Parse code directly:
 
 ```python
-import VHDLproc
+from vhdlproc import VHDLproc
 
 processor = VHDLproc()
 
