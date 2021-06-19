@@ -55,7 +55,16 @@ class VHDLproc:
 
         return eval(statement)
 
-    def parse(self, code, identifiers={}):
+    def parse_file(self, file, identifiers={}):
+        code = []
+        for line in open(file):
+            code.append(line.rstrip('\n'))
+
+        include_path = '/'.join(file.split('/')[:-1]) + '/'
+        
+        return self.parse(code, identifiers, include_path=include_path)
+
+    def parse(self, code, identifiers={}, include_path="./"):
         identifiers['TOOL_NAME']    = self.__tool_name
         identifiers['TOOL_VERSION'] = self.__version
         if 'VHDL_VERSION' not in identifiers:
@@ -97,7 +106,7 @@ class VHDLproc:
                         if len(directive) < 2:
                             raise Exception(f'VHDLproc: Line {line_i+1}: `warning directive requires a message')
                         warning_message = directive[1].replace('"','').replace("'","")
-                        logger.warning(f'VHDLproc: Line {line_i+1}: Warning: {warning_message}')
+                        logger.warning(f'VHDLproc: Warning: Line {line_i+1}: {warning_message}')
 
                     # print error messages if not commented out
                     elif directive[0] == '`error' and not ifstack[-1]:
@@ -111,7 +120,7 @@ class VHDLproc:
                     # @todo Source file include location
                     # @body Include from the source files local path instead of a path from where the program is executed
                     elif directive[0] == '`include':
-                        filename = " ".join(directive[1:]).replace('"','').replace("'","")
+                        filename = include_path + " ".join(directive[1:]).replace('"','').replace("'","")
                         include = []
                         for incl_line in open(filename):
                             include.append(incl_line.rstrip('\n'))
@@ -155,16 +164,15 @@ if __name__ == "__main__":
         for id in args.D:
             identifiers[id.split('=')[0]] = str(id.split('=')[1])
 
-    code = []
+    proc = VHDLproc()
     if args.i:
-        for line in open(args.i):
-            code.append(line.rstrip('\n'))
+        parsed_code = proc.parse_file(args.i, identifiers=identifiers)
     else:
+        code = []
         for line in sys.stdin:
             code.append(line.rstrip('\n'))
+        parsed_code = proc.parse(code, identifiers=identifiers)
 
-    proc = VHDLproc()
-    parsed_code = proc.parse(code, identifiers=identifiers)
 
     if args.o:
         open(args.o, 'w+').write(parsed_code)
