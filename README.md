@@ -1,148 +1,105 @@
 # VHDLproc
 
-VHDLproc is a simple command line VHDL preprocessor with C-like preprocessor functions, written in Python
-
-Recreation of `vpp` version 2.0.3d which is Copyright (c) 2006-2020 Takashige Sugie <takashige@users.sourceforge.net> and licensed under GPL version 2 or later. The latest version of vpp is available [here](https://sourceforge.net/projects/vhdlpp/).
-
-Note: This does not follow the conditional analysis spec documented in VHDL-2019.
-
-## Build and Install
-
-From Linux, simply make `src/vhdlproc` executable by running `chmod +x src/vhdlproc`. Then the program can be run directly via `./src/vhdlproc`. Requires the Python libs `os`, `sys`, `random`, `datetime`, and `argparse`.
+VHDLproc is a simple command line VHDL preprocessor written in Python following the conditional compilation directives outlined in VHDL-2019
 
 ## Usage
 
-### Command Line Options
+### Command Line
+
 ```
-usage: vhdlproc [-h] [-D LABEL=VALUE] [-l] [-q] [-v] [--version] [--comment CHAR] [--directive CHAR]
-                [input] [output]
+usage: vhdlproc.py [-h] [-i I] [-o O] [-D IDENTIFIER=value]
 
-VHDLproc v1.1.1 - VHDL Preprocessor
-
-positional arguments:
-  input                 Input file (Pass - to read from stdin)
-  output                Output file (defaults to [filename]-out.vhdl) (pass - to print to stdout)
+VHDLproc v1.2.0 - VHDL Preprocessor
 
 optional arguments:
-  -h, --help            show this help message and exit
-  -D LABEL=VALUE, --define LABEL=VALUE
-                        Define a label as a given value
-  -l, --listppd         Print preprocessing directives
-  -q                    Quiet output
-  -v                    Verbose output
-  --version             show program's version number and exit
-  --comment CHAR        Character to comment out with (default: -- )
-  --directive CHAR      Character for preprocessor directives (default: ` )
+  -h, --help           show this help message and exit
+  -i I                 Input file (Omit to read from stdin)
+  -o O                 Output file (Omit to print to stdout)
+  -D IDENTIFIER=value  Specify identifiers for conditional compilation, ex. DEBUG_LEVEL=2
 ```
 
-You can read from stdin, but it can only print to stdout. This can be then used to pipe to other programs.
-```
-$ cat tests/define.vhdl | ./src/vhdlproc -
--- `define TEST "hello"
--- `define HELLO fun
+You can read from stdin or a file, and print to stdout or another file.
 
-"hello"
+```
+$ cat tests/define.vhdl | python vhdlproc/vhdlproc.py
+`if VHDL_VERSION >= "2008" then
+...
+`end if
 ...
 ```
 
-### Preprocessor Directives (what you put in your VHDL files)
-```
-/* ... */               -   Comment out from /* to */
+### Python Library
 
-`include FILENAME       -   Include another file relative to
+Parse files:
+
+```python
+import VHDLproc
+
+processor = VHDLproc()
+
+identifiers = {"VHDL_VERSION": "2008"}
+
+parsed_text = processor.parse_file("path/to/file.vhdl", identifiers=identifiers)
+```
+
+Parse code directly:
+
+```python
+import VHDLproc
+
+processor = VHDLproc()
+
+identifiers = {"VHDL_VERSION": "2008"}
+
+code = '''
+`warning "Hello"
+'''
+
+parsed_text = processor.parse_file(code, identifiers=identifiers, include_path="path/to/pull/include/directives/from")
+```
+
+### Preprocessor Directives (what you put in your VHDL files)
+
+```
+`define LABEL "STRING"  -   Gives LABEL the value of STRING for
+                            conditional statements
+
+`include "FILENAME"     -   Include another file relative to
                             the location of the source
 
-`define LABEL           -   Define LABEL for `ifdef and `ifndef
+`if {CONDITIONAL} then
 
-`define LABEL STRING    -   Replace LABEL by STRING, can be multiple words
-                            Will replace ignoring single quotes and attributes ('', ')
-                            Will not replace within double quotes ("")
+`elsif {CONDITIONAL} then
 
-`rand LABEL FORMAT      -   Replace LABEL by generated random characters
-                            according to FORMAT. FORMAT has an alphabet
-                            for radix and a digit number for generating,
-                            The radix character can be set by 'B'(bin),
-                            'D'(dec), 'H'(hex) and 'A'(alphabet)
+`else
 
-`undef LABEL            -   Undefine LABEL by `define and `rand
+`end [if]
 
-`ifdef LABEL            -   If LABEL is defined, then the following is valid
-                            until `else or `endif
-                            Can be nested
+`warning "STRING"
 
-`ifndef LABEL           -   If LABEL is not defined, then following program
-                            is valid until `else or `endif
-                            Can be nested
-
-`else                   -   Reverse condition for `ifdef and `ifndef
-
-`endif                  -   Terminator for `ifdef, `ifndef and `else
-
-`for INT                -   Duplicate program code until `endfor INT times
-                            Can be nested
-
-`endfor                 -   Terminator for `for
-
-`message STRING         -   Print STRING to the standard output stream
-
-`error STRING           -   Print STRING to standard error output stream
+`error "STRING"         -   Print STRING to standard error output stream
                             Will force close VHDLproc without saving
 ```
 
-The preprocessor character (default: \` ) can either be changed by the command line option `--directive CHAR` or by the environment variable `VHDLPROC_DIRECTIVE`. The command line option supersedes the environment variable, which supersedes the default.
+### Identifiers (or Labels)
 
-It's possible to use `#` as the preprocessor directive by passing in `--directive "#"` or by setting the environment variable `export VHDLPROC_DIRECTIVE="#"`.
-
-The comment character (default: -- ) can either be changed by the command line option `--comment CHAR` or by the environment variable `VHDLPROC_COMMENT`. The command line option supersedes the environment variable, which supersedes the default.
-
-There are some predefined labels as follows:
-- `__FILE__`: Full path to the input file, set to `"STDIN"` when reading from stdin
-- `__LINE__`: The current input line number as a string, not affected by for repeats
-- `__DATE__`: The current date formatted as a string as `"Jan 01 1970"`
-- `__TIME__`: The current time formatted as a string as `"00:00:00"`, 24 hour clock
+By default, `TOOL_NAME` is set to `VHDLproc` and `TOOL_VERSION` is set to the current version of the code, these cannot be changed.
 
 ## Examples
 
 More examples included under `tests/`.
 
-### Multiline Comment
-
-Input:
-```
-/*
-component pll is
-    port (
-        clk_in : in std_logic;
-        clk_out : out std_logic;
-        clk_locked : out std_logic
-    );
-end component;
-*/
-
-```
-
-Output:
-```
--- /*
--- component pll is
---     port (
---         clk_in : in std_logic;
---         clk_out : out std_logic;
---         clk_locked : out std_logic
---     );
--- end component;
--- */
-```
-
 ### Include File
 
 Input:
-```
+
+```vhdl
 `include "include-to.vhdl"
 ```
 
 include-to.vhdl:
-```
+
+```vhdl
 component pll is
     port (
         clk_in : in std_logic;
@@ -153,7 +110,8 @@ end component;
 ```
 
 Output:
-```
+
+```vhdl
 -- `include "include-to.vhdl"
 component pll is
     port (
@@ -164,193 +122,94 @@ component pll is
 end component;
 ```
 
-### Print Message
+### Define, Repeated If/Elsif
 
 Input:
-```
-`message This test was successful
-```
+```vhdl
+`define a "a"
+`define b "z"
 
-Command-line:
-```
-$ ./src/vhdlproc tests/message.vhdl
-Message: This test was successful
-$
-```
-
-Output:
-```
--- `message This test was successful
-```
-
-### For loop
-
-For loops work by replacing the definitions of words and resolving nested if and for loops within it, then duplicating the selection multiple times.
-
-Input:
-```
-`for 2
-
-FORK spoon
-
-`define FORK spoon
-
-FORK spoon
-
-`define spoon FORK
-
-FORK spoon
-
-`endfor
-```
-
-Output:
-```
--- `for 2
-
-FORK spoon
-
--- `define FORK spoon
-
-spoon spoon
-
--- `define spoon FORK
-
-FORK FORK
-
---
-
-FORK spoon
-
--- `define FORK spoon
-
-spoon spoon
-
--- `define spoon FORK
-
-FORK FORK
-
--- `endfor
-```
-
-### Define
-
-Input:
-```
-`define TEST "hello"
-`define HELLO fun
-
-TEST
-
-`define TEST2
-
-`ifdef TEST2
-
-`ifndef TEST4
-
-TEST TEST TEST'test
-
+`if a = "a" and b = "b" then
+a = "a" and b = "b"
+`elsif a /= "a" and b = "b" then
+a /= "a" and b = "b"
+`elsif a = "a" and b /= "b" then
+a = "a" and b /= "b"
+`elsif a /= "a" and b /= "b" then
+a /= "a" and b /= "b"
 `else
-
-tsktstk
-
-`endif
-
-TEST
-
-`else
-
-(TEST TEST: no TEST)
-
-`endif
-
-`ifndef TEST3
-
-TEST TEST TEST_TEST HELLO
-
-`endif
-
-`define meow_1 "hello there my name is al"
-
-meow_1
-```
-
-output:
-```
--- `define TEST "hello"
--- `define HELLO fun
-
-"hello"
-
--- `define TEST2
-
--- `ifdef TEST2
-
--- `ifndef TEST4
-
-"hello" "hello" "hello"'test
-
--- `else
-
--- tsktstk
-
--- `endif
-
-"hello"
-
--- `else
-
--- (TEST TEST: no TEST)
-
--- `endif
-
--- `ifndef TEST3
-
-"hello" "hello" TEST_TEST fun
-
--- `endif
-
--- `define meow_1 "hello there my name is al"
-
-"hello there my name is al"
-```
-
-### Random definition
-
-Input:
-```
-`rand TEST1 B10
-
-TEST1
-
-`rand TEST2 D5
-
-TEST2
-
-`rand TEST3 H20
-
-TEST3
-
-`rand TEST4 A50
-
-TEST4
+`warning "Not supposed to be here"
+`end
 ```
 
 Output:
+```vhdl
+-- `define a "a"
+-- `define b "z"
+
+-- `if a = "a" and b = "b" then
+-- a = "a" and b = "b"
+-- `elsif a /= "a" and b = "b" then
+-- a /= "a" and b = "b"
+-- `elsif a = "a" and b /= "b" then
+a = "a" and b /= "b"
+-- `elsif a /= "a" and b /= "b" then
+-- a /= "a" and b /= "b"
+-- `else
+-- `warning "Not supposed to be here"
+-- `end
 ```
--- `rand TEST1 B10
 
-1010011100
+### Nested If
 
--- `rand TEST2 D5
+Input:
+```vhdl
+`define a "a"
+`define b "b"
 
-78352
+`if a = "a" then
+    `if b = "b" then
+        a = "a" and b = "b"
+    `else
+        a = "a" and b /= "b"
+    `end
+`end
+```
 
--- `rand TEST3 H20
+Output:
+```vhdl
+-- `define a "a"
+-- `define b "b"
 
-7FAEECA221BFF5B9D27F
+-- `if a = "a" then
+--     `if b = "b" then
+        a = "a" and b = "b"
+--     `else
+--         a = "a" and b /= "b"
+--     `end
+-- `end
+```
 
--- `rand TEST4 A50
+### VHDL Version
 
-XWTBBLNTTXUFLGLWUSYMFLRBNVHQKPCBTBOSKJHNQVEXOCGKDV
+Input:
+```vhdl
+`define VHDL_VERSION "2019"
+`if VHDL_VERSION >= "2008" then
+constant enable_features : bool := true
+`else
+`warning "Certain features disabled!"
+constant enable_features : bool := false
+`end
+```
+
+Output:
+```vhdl
+-- `define VHDL_VERSION "2019"
+-- `if VHDL_VERSION >= "2008" then
+constant enable_features : bool := true
+-- `else
+-- `warning "Certain features disabled!"
+-- constant enable_features : bool := false
+-- `end
 ```

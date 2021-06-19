@@ -1,6 +1,0 @@
-
-`undef TEST3
-
-TEST3
-
-TEST2
