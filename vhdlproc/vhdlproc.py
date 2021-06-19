@@ -25,13 +25,30 @@ class VHDLproc:
 
         statement = statement.lower()
 
-        # using truediv as it has higher precedence than bitwise or
-        # not using native python == as it has lower precedence than 
-        # bitwise or
-        statement = statement.replace(   ' = ',  ' /eq/ ')
-        statement = statement.replace(  ' /= ', ' /neq/ ')
-        statement = statement.replace( ' xor ', ' |xor| ')
-        statement = statement.replace(' xnor ',' |xnor| ')
+        operators = ('=', '/=', '<', '<=', '>', '>=',
+                     'and', 'or', 'nand', 'nor', 'xor', 'xnor')
+
+        for name in statement.replace('(', ' ').replace(')', ' ').split(' '):
+            if name not in identifiers and name not in operators and "'" not in name and '"' not in name:
+                logger.warning(f'VHDLproc: Warning: Setting empty identifier {name}')
+                identifiers[name] = ""
+                
+
+        # replacing VHDL operators with Python ones to preserve VHDL 
+        # operator precedence, / has higher precedence than |
+        statement = statement.replace(   ' = ',  ' /r_eq/ ')
+        statement = statement.replace(  ' /= ', ' /r_neq/ ')
+        statement = statement.replace(   ' < ',  ' /r_lt/ ')
+        statement = statement.replace(  ' <= ', ' /r_leq/ ')
+        statement = statement.replace(   ' > ',  ' /r_gt/ ')
+        statement = statement.replace(  ' >= ', ' /r_geq/ ')
+
+        statement = statement.replace( ' and ', ' |l_and| ')
+        statement = statement.replace(  ' or ',  ' |l_or| ')
+        statement = statement.replace(' nand ',' |l_nand| ')
+        statement = statement.replace( ' nor ', ' |l_nor| ')
+        statement = statement.replace( ' xor ', ' |l_xor| ')
+        statement = statement.replace(' xnor ',' |l_xnor| ')
 
         for id in identifiers:
             locals()[id.lower()] = identifiers[id].lower()
