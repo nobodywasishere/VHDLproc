@@ -6,6 +6,7 @@ import argparse
 import logging
 
 from infix import *
+import test
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,8 @@ class VHDLproc:
         for id in identifiers:
             locals()[id.lower()] = identifiers[id].lower()
 
+        # print(f'Evaluating statement {statement}: {eval(statement)}')
+
         return eval(statement)
 
     def parse_file(self, file, identifiers={}):
@@ -76,12 +79,14 @@ class VHDLproc:
         if 'TOOL_EDITION' not in identifiers:
             identifiers['TOOL_EDITION'] = ""
 
-        ifstack = [False]
+        ifstack = [[True, False]]
         line_i = -1
 
         while line_i < len(code) - 1:
             line_i = line_i + 1
             line = code[line_i].split('--')[0] # ignore comments
+
+            # print(f'\nline:    {line}')
 
             if len(line.strip()) == 0: # skip empty lines
                 continue
@@ -96,20 +101,20 @@ class VHDLproc:
 
                 directive[0] = directive[0].lower()
 
-                if not ifstack[-1]:
+                if ifstack[-1][0]:
                     # if it's not a supported directive
                     if directive[0] not in self.__directives:
                         raise Exception(f"VHDLproc: Line {line_i+1}: Unknown directive: {line.strip().split(' ')[0]}")
 
                     # print warning messages if not commented out
-                    elif directive[0] == '`warning' and not ifstack[-1]:
+                    elif directive[0] == '`warning':
                         if len(directive) < 2:
                             raise Exception(f'VHDLproc: Line {line_i+1}: `warning directive requires a message')
                         warning_message = directive[1].replace('"','').replace("'","")
                         logger.warning(f'VHDLproc: Warning: Line {line_i+1}: {warning_message}')
 
                     # print error messages if not commented out
-                    elif directive[0] == '`error' and not ifstack[-1]:
+                    elif directive[0] == '`error':
                         if len(directive) < 2:
                             raise Exception(f'VHDLproc: Line {line_i+1}: `error directive requires a message')
                         error_message = directive[1].replace('"','').replace("'","")
@@ -117,8 +122,6 @@ class VHDLproc:
                         exit(1)
 
                     # open file and append source code at this location
-                    # @todo Source file include location
-                    # @body Include from the source files local path instead of a path from where the program is executed
                     elif directive[0] == '`include':
                         filename = include_path + " ".join(directive[1:]).replace('"','').replace("'","")
                         include = []
@@ -129,22 +132,35 @@ class VHDLproc:
                 if directive[0] == '`if':
                     if directive[-1] != "then":
                         raise Exception(f'VHDLproc: Line {line_i+1}: `if directive requires a then')
-                    ifstack.append(not self.__eval(directive[1:-1], identifiers))
+                    if ifstack[-1][0]:
+                        resp = self.__eval(directive[1:-1], identifiers)
+                        ifstack.append([resp, resp])
+                    else:
+                        ifstack.append([False, True])
 
                 elif directive[0] == '`elsif':
-                    if not ifstack[-2] and self.__eval(directive[1:-1], identifiers):
-                        ifstack[-1] = not ifstack[-1]
+                    # if not ifstack[-2][0] and ifstack[-1][0] and not ifstack[-1][1]:
+                    #     resp = self.__eval(directive[1:-1], identifiers)
+                    #     if resp:
+                    #         ifstack[-1][0] = not ifstack[-1][0]
+                    #     ifstack[-1][1] = ifstack[-1][1] or resp
+                    resp = self.__eval(directive[1:-1], identifiers)
+                    ifstack[-1][0] = not ifstack[-1][1] and resp
+                    ifstack[-1][1] = ifstack[-1][1] or resp
 
                 elif directive[0] == '`else':
-                    if not ifstack[-2]:
-                        ifstack[-1] = not ifstack[-1]
+                    # if not ifstack[-2][0] and not ifstack[-1][1]:
+                    if ifstack[-2][0]:
+                        ifstack[-1][0] = not ifstack[-1][1]
 
                 elif directive[0] == '`end':
                     ifstack.pop()
 
             # don't comment out lines that are already commented out
-            if ifstack[-1] and code[line_i].strip()[:2] != "--":
+            if not ifstack[-1][0] and code[line_i].strip()[:2] != "--":
                 code[line_i] = self.__comment_char + code[line_i]
+
+            # print(f'ifstack: {ifstack}')
 
         if len(ifstack) > 1:
             raise Exception(f"VHDLproc: Line {line_i+1}: Missing `end [ if ]")
@@ -155,8 +171,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=f"VHDLproc v{__version__} - VHDL Preprocessor")
     parser.add_argument('-i', help='Input file (Omit to read from stdin)')
     parser.add_argument('-o', help='Output file (Omit to print to stdout)')
+    parser.add_argument('--test', action='store_true', help='Tests VHDLproc to ensure functionality')
     parser.add_argument('-D', action="append", metavar="IDENTIFIER=value", help='Specify identifiers for conditional compilation, ex. DEBUG_LEVEL=2')
     args = parser.parse_args()
+
+    if args.test:
+        retn = test.test_all()
+        exit(retn)
+        
 
     identifiers = {}
 
