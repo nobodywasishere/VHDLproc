@@ -1,6 +1,29 @@
 # VHDLproc
 
-VHDLproc is a simple command line VHDL preprocessor written in Python following the conditional compilation directives outlined in VHDL-2019
+VHDLproc is a simple command line VHDL preprocessor written in Python following the conditional compilation directives outlined in VHDL-2019, with a few addons
+
+## Installation
+
+VHDLproc can be installed via pip:
+```
+$ pip install vhdlproc
+$ vhdlproc --help
+```
+
+It can also be installed from source
+```
+$ git clone https://github.com/nobodywasishere/vhdlproc
+$ cd vhdlproc
+$ python setup.py install --user
+$ vhdlproc --help
+```
+
+It can also simply be run as a standalone file
+```
+$ git clone https://github.com/nobodywasishere/vhdlproc
+$ cd vhdlproc
+$ ./vhdlproc/vhdlproc.py --help
+```
 
 ## Usage
 
@@ -51,9 +74,14 @@ processor = VHDLproc()
 
 identifiers = {"VHDL_VERSION": "2008"}
 
-code = '''
-`warning "Hello"
-'''
+code = [
+    '`warning "Hello"',
+    'constant test_var : integer := 100',
+    '`if TOOL_VERSION < "2.0" then',
+    '`error "UNSUPPORTED VHDLPROC VERSION"',
+    '`end',
+    '`include "some/file.vhdl"',
+]
 
 parsed_text = processor.parse_file(code, identifiers=identifiers, include_path="path/to/pull/include/directives/from")
 ```
@@ -87,7 +115,7 @@ By default, `TOOL_NAME` is set to `VHDLproc` and `TOOL_VERSION` is set to the cu
 
 ## Examples
 
-More examples included under `tests/`.
+More examples included under `vhdlproc/tests/`.
 
 ### Include File
 
@@ -168,11 +196,11 @@ Input:
 `define b "b"
 
 `if a = "a" then
-    `if b = "b" then
-        a = "a" and b = "b"
-    `else
-        a = "a" and b /= "b"
-    `end
+`if b = "b" then
+a = "a" and b = "b"
+`else
+a = "a" and b /= "b"
+`end
 `end
 ```
 
@@ -182,11 +210,11 @@ Output:
 -- `define b "b"
 
 -- `if a = "a" then
---     `if b = "b" then
-        a = "a" and b = "b"
---     `else
---         a = "a" and b /= "b"
---     `end
+-- `if b = "b" then
+a = "a" and b = "b"
+-- `else
+-- a = "a" and b /= "b"
+-- `end
 -- `end
 ```
 

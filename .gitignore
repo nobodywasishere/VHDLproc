@@ -1,2 +1,3 @@
-tests/*-out.vhdl
 __pycache__
+dist
+vhdlproc.egg-info
