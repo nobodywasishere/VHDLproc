@@ -1,6 +1,6 @@
 # VHDLproc
 
-VHDLproc is a simple command line VHDL preprocessor written in Python following the conditional compilation directives outlined in VHDL-2019, with a few addons
+VHDLproc is a simple command line VHDL preprocessor written in Python following the conditional compilation directives outlined in VHDL-2019, with a few extensions.
 
 ## Installation
 
@@ -74,6 +74,7 @@ processor = VHDLproc()
 
 identifiers = {"VHDL_VERSION": "2008"}
 
+# Parse list of lines of text
 code = [
     '`warning "Hello"',
     'constant test_var : integer := 100',
@@ -83,17 +84,25 @@ code = [
     '`include "some/file.vhdl"',
 ]
 
-parsed_text = processor.parse_file(code, identifiers=identifiers, include_path="path/to/pull/include/directives/from")
+parsed_text_list = processor.parse_file(code, identifiers=identifiers, include_path="path/to/pull/include/directives/from")
+
+# Parse string
+code = '''
+`warning "Hello"
+constant test_var : integer := 100
+`if TOOL_VERSION < "2.0" then
+`error "UNSUPPORTED VHDLPROC VERSION"
+`end
+`include "some/file.vhdl"
+'''
+
+parsed_text_str = processor.parse_file(code, identifiers=identifiers, include_path="path/to/pull/include/directives/from")
 ```
 
 ### Preprocessor Directives (what you put in your VHDL files)
 
-```
-`define LABEL "STRING"  -   Gives LABEL the value of STRING for
-                            conditional statements
-
-`include "FILENAME"     -   Include another file relative to
-                            the location of the source
+```vhdl
+-- VHDL-2019 directives
 
 `if {CONDITIONAL} then
 
@@ -103,15 +112,31 @@ parsed_text = processor.parse_file(code, identifiers=identifiers, include_path="
 
 `end [if]
 
-`warning "STRING"
+`warning "STRING"       -   Print STRING to standard error output stream
 
 `error "STRING"         -   Print STRING to standard error output stream
                             Will force close VHDLproc without saving
+
+-- Additional extensions not part of VHDL-2019
+
+`define LABEL "STRING"  -   Gives LABEL the value of STRING for
+                            conditional statements
+
+`include "FILENAME"     -   Include another file relative to
+                            the location of the source
 ```
 
 ### Identifiers (or Labels)
 
 By default, `TOOL_NAME` is set to `VHDLproc` and `TOOL_VERSION` is set to the current version of the code, these cannot be changed.
+
+## Todo
+
+- [ ] Seperate infix definitions, tests, and the main components of VHDLproc into their own files
+- [ ] Prevent a file from including itself (to prevent infinite loops)
+- [ ] Modify text and file operations to work on Windows (if they don't already)
+- [ ] Throw an error if a `` `warning `` or `` `error `` string isn't wrapped in quotes
+- [ ] Add the option to the CLI to take in a series of file inputs, process them, save the individual results to temporary files (i.e. in `/tmp/` or a local path), then return all of the filepaths. This would be useful for doing this with GHDL: `ghdl -a $(vhdlproc -f *.vhdl)`. 
 
 ## Examples
 

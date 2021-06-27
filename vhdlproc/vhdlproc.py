@@ -10,7 +10,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-__version__ = "2.0"
+__version__ = "2.1"
 
 
 # Infix class based on https://code.activestate.com/recipes/384122/
@@ -102,6 +102,9 @@ class VHDLproc:
         return self.parse(code, identifiers, include_path=include_path)
 
     def parse(self, code, identifiers={}, include_path="./"):
+        if isinstance(code, str):
+            code = code.splitlines()
+
         identifiers['TOOL_NAME']    = self.__tool_name
         identifiers['TOOL_VERSION'] = self.__version
         if 'VHDL_VERSION' not in identifiers:
