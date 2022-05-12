@@ -11,7 +11,7 @@ setup(
     license="GPLv3",
     packages=["vhdlproc"],
     package_data={"vhdlproc": ["tests/*"]},
-    install_requires=["argparse", "black"],
+    install_requires=[],
     classifiers=[
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.6",

@@ -8,7 +8,7 @@ from typing import Dict, List, Union
 
 logger = logging.getLogger(__name__)
 
-__version__ = "v2.1"
+__version__ = "v2.2"
 
 
 # Infix class based on https://code.activestate.com/recipes/384122/
@@ -270,7 +270,7 @@ class VHDLproc:
             if not ifstack[-1][0] and code[line_i].strip()[:2] != "--":
                 code[line_i] = self._comment_char + code[line_i]
 
-            # print(f'ifstack: {ifstack}')
+            # logging.debug(f'ifstack: {ifstack}')
 
         if len(ifstack) > 1:
             raise Exception(f"Line {line_i+1}: Missing `end [ if ]")
@@ -288,7 +288,7 @@ def test_file(name: str, identifiers: Dict[str, str] = {}) -> bool:
     Returns:
         bool: Whether the test passed or failed
     """
-    print(f"\n== Testing {name} ==")
+    logging.info(f"\n== Testing {name} ==")
     proc = VHDLproc()
     filename = os.path.dirname(__file__) + f"/tests/{name}.vhdl"
     passed = True
@@ -308,23 +308,27 @@ def test_file(name: str, identifiers: Dict[str, str] = {}) -> bool:
     return passed
 
 
-def test_all():
+def test_all(identifiers: Dict[str, str]):
     """Runs the 'include', 'and', and 'nest' tests
 
     Returns:
         bool: Whether the tests passed or failed
     """
-    return not (test_file("include") and test_file("and") and test_file("nest"))
+    return not (
+        test_file("include", identifiers)
+        and test_file("and", identifiers)
+        and test_file("nest", identifiers)
+    )
 
 
 def _cli():
     parser = argparse.ArgumentParser(
-        description=f"VHDLproc v{__version__} - VHDL Preprocessor"
+        description=f"VHDLproc {__version__} - VHDL Preprocessor"
     )
-    parser.add_argument("-i", help="Input file (Omit to read from stdin)")
-    parser.add_argument("-o", help="Output file (Omit to print to stdout)")
     parser.add_argument(
-        "--test", action="store_true", help="Tests VHDLproc to ensure functionality"
+        "input",
+        nargs="*",
+        help="Input files (will skip over files with the output extension)",
     )
     parser.add_argument(
         "-D",
@@ -333,38 +337,64 @@ def _cli():
         help="Specify identifiers for conditional compilation, ex. DEBUG_LEVEL=2",
     )
     parser.add_argument(
+        "-o",
+        metavar="DIRECTORY",
+        help="Directory to store parsed files",
+    )
+    parser.add_argument(
+        "-e",
+        metavar="EXTENSION",
+        default=".proc.vhdl",
+        help="Output extension for processed files (defaults to '.proc.vhdl')",
+    )
+    parser.add_argument(
+        "--self-test",
+        action="store_true",
+        help="Run a self-test to ensure functionality",
+    )
+    parser.add_argument(
         "--log-level",
+        metavar="LEVEL",
         default=logging.INFO,
         type=(lambda x: getattr(logging, x)),
-        help="Configure the logging level.",
+        help="Configure the logging level",
     )
     args = parser.parse_args()
 
     logging.basicConfig(level=args.log_level, format="%(levelname)s: %(message)s")
 
-    if args.test:
-        retn = test_all()
-        exit(retn)
+    identifiers = (
+        {id.split("=")[0]: str(id.split("=")[1]) for id in args.D} if args.D else {}
+    )
 
-    identifiers = {}
+    if args.self_test:
+        test_all(identifiers)
+        return
 
-    if args.D:
-        for id in args.D:
-            identifiers[id.split("=")[0]] = str(id.split("=")[1])
+    if not os.path.exists(args.temp_dir):
+        os.makedirs(args.temp_dir)
 
     proc = VHDLproc()
-    if args.i:
-        parsed_code = proc.parse_file(args.i, identifiers=identifiers)
-    else:
-        code = []
-        for line in sys.stdin:
-            code.append(line.rstrip("\n"))
-        parsed_code = proc.parse(code, identifiers=identifiers)
+    for file in args.input:
+        if file.endswith(args.extension):
+            logging.debug(f"Skipping file {file}")
+            continue
 
-    if args.o:
-        open(args.o, "w+").write(parsed_code)
-    else:
-        print(parsed_code)
+        if args.out_dir is not None:
+            newfile = os.path.join(
+                args.out_dir,
+                os.path.splitext(os.path.basename(file))[0] + args.extension,
+            )
+        else:
+            newfile = os.path.splitext(file)[0] + args.extension
+
+        print(newfile)
+
+        logging.debug(f"Parsing file {file} to {newfile}")
+
+        parsed_code = proc.parse_file(file, identifiers=identifiers)
+        with open(newfile, "w") as f:
+            f.write(parsed_code)
 
 
 if __name__ == "__main__":

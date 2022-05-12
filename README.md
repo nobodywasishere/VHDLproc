@@ -30,30 +30,48 @@ $ ./vhdlproc/vhdlproc.py --help
 ### Command Line
 
 ```
-usage: vhdlproc.py [-h] [-i I] [-o O] [-D IDENTIFIER=value]
+usage: vhdlproc.py [-h] [-D IDENTIFIER=value] [-o DIRECTORY] [-e EXTENSION] [--self-test]
+                   [--log-level LEVEL]
+                   [input ...]
 
-VHDLproc v1.2.0 - VHDL Preprocessor
+VHDLproc v2.2 - VHDL Preprocessor
 
-optional arguments:
+positional arguments:
+  input                Input files (will skip over files with the output extension)
+
+options:
   -h, --help           show this help message and exit
-  -i I                 Input file (Omit to read from stdin)
-  -o O                 Output file (Omit to print to stdout)
   -D IDENTIFIER=value  Specify identifiers for conditional compilation, ex. DEBUG_LEVEL=2
+  -o DIRECTORY         Directory to store parsed files
+  -e EXTENSION         Output extension for processed files (defaults to '.proc.vhdl')
+  --self-test          Run a self-test to ensure functionality
+  --log-level LEVEL    Configure the logging level
 ```
 
-You can read from stdin or a file, and print to stdout or another file.
+A basic example, where VHDLproc will parse each input file, output the processed text to a new file with a given extension, and the processed files are then passed to GHDL:
 
+```bash
+vhdlproc *.vhdl              # preprocess all the files
+ghdl -a --std=08 *.proc.vhdl # pass processed files to ghdl
+ghdl -r --std=08 testbench   # run simulation
 ```
-$ cat tests/define.vhdl | python vhdlproc/vhdlproc.py
-`if VHDL_VERSION >= "2008" then
-...
-`end if
-...
+
+As VHDLproc also outputs each of the processed filenames to STDOUT, this would also work:
+```bash
+ghdl -a --std=08 $(vhdlproc *.vhdl)
+ghdl -r --std=08 testbench
+```
+
+The parsed files can also be stored to another directory:
+```bash
+vhdlproc *.vhdl -o build/     # preprocess all the files and store in build/
+ghdl -a --std=08 build/*.vhdl # pass processed files in build/ to ghdl
+ghdl -r --std=08 testbench    # run simulation
 ```
 
 ### Python Library
 
-Parse files:
+Parse files (will automatically set the include path):
 
 ```python
 from vhdlproc import VHDLproc
@@ -84,7 +102,7 @@ code = [
     '`include "some/file.vhdl"',
 ]
 
-parsed_text_list = processor.parse_file(code, identifiers=identifiers, include_path="path/to/pull/include/directives/from")
+parsed_text = processor.parse(code, identifiers=identifiers, include_path="path/to/pull/include/directives/from")
 
 # Parse string
 code = '''
@@ -96,7 +114,7 @@ constant test_var : integer := 100
 `include "some/file.vhdl"
 '''
 
-parsed_text_str = processor.parse_file(code, identifiers=identifiers, include_path="path/to/pull/include/directives/from")
+parsed_text = processor.parse(code, identifiers=identifiers, include_path="path/to/pull/include/directives/from")
 ```
 
 ### Preprocessor Directives (what you put in your VHDL files)
@@ -136,7 +154,7 @@ By default, `TOOL_NAME` is set to `VHDLproc` and `TOOL_VERSION` is set to the cu
 - [ ] Prevent a file from including itself (to prevent infinite loops)
 - [ ] Modify text and file operations to work on Windows (if they don't already)
 - [ ] Throw an error if a `` `warning `` or `` `error `` string isn't wrapped in quotes
-- [ ] Add the option to the CLI to take in a series of file inputs, process them, save the individual results to temporary files (i.e. in `/tmp/` or a local path), then return all of the filepaths. This would be useful for doing this with GHDL: `ghdl -a $(vhdlproc -f *.vhdl)`. 
+- [x] Add the option to the CLI to take in a series of file inputs, process them, save the individual results to temporary files (i.e. in `/tmp/` or a local path), then return all of the filepaths. This would be useful for doing this with GHDL: `ghdl -a $(vhdlproc *.vhdl)`. 
 
 ## Examples
 
