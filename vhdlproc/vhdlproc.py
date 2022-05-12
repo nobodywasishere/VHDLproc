@@ -10,7 +10,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-__version__ = "2.1"
+__version__ = "v2.1"
 
 
 # Infix class based on https://code.activestate.com/recipes/384122/

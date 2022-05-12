@@ -1,12 +1,13 @@
 from setuptools import setup
+from vhdlproc import vhdlproc
 
 setup(
     name='vhdlproc',
-    version='2.0',    
+    version=vhdlproc.__version__,    
     description='A simple VHDL preprocessor',
     url='https://github.com/nobodywasishere/vhdlproc',
-    author='Michael Riegert',
-    author_email='michael@eowyn.net',
+    author='Margret Riegert',
+    author_email='margret@eowyn.net',
     license='GPLv3',
     packages=['vhdlproc'],
     package_data={'vhdlproc': ['tests/*']},
