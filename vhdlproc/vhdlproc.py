@@ -384,22 +384,22 @@ def _cli():
         test_all(identifiers)
         return
 
-    if not os.path.exists(args.temp_dir):
-        os.makedirs(args.temp_dir)
-
     proc = VHDLproc()
     for file in args.input:
-        if file.endswith(args.extension):
+        if file.endswith(args.e):
             logging.debug(f"Skipping file {file}")
             continue
 
-        if args.out_dir is not None:
+        if args.o is not None:
+            if not os.path.exists(args.o):
+                os.makedirs(args.o)
+
             newfile = os.path.join(
-                args.out_dir,
-                os.path.splitext(os.path.basename(file))[0] + args.extension,
+                args.o,
+                os.path.splitext(os.path.basename(file))[0] + args.e,
             )
         else:
-            newfile = os.path.splitext(file)[0] + args.extension
+            newfile = os.path.splitext(file)[0] + args.e
 
         print(newfile)
 
