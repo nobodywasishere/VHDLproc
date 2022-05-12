@@ -1,10 +1,10 @@
 `warning "== Including file =="
-`define Include_file "true"
+`define Include_file "TRUE"
 
 `if INCLUDE_FILE = "TRUE" then
 `include "../tests/include-to.vhdl"
 `else
-`Warning "Not including thing"
+`error "Not including thing"
 `end if
 
 `warning "== Not including file =="

@@ -17,16 +17,37 @@ class Infix:
     def __init__(self, function):
         self.function = function
 
-    def __or__(self, other):
-        return self.function(other)
-
-    def __ror__(self, other):
-        return Infix(lambda x, self=self, other=other: self.function(other, x))
+    def __pow__(self, other):
+        return not other
 
     def __truediv__(self, other):
         return self.function(other)
 
     def __rtruediv__(self, other):
+        return Infix(lambda x, self=self, other=other: self.function(other, x))
+
+    def __add__(self, other):
+        return self.function(other)
+
+    def __radd__(self, other):
+        return Infix(lambda x, self=self, other=other: self.function(other, x))
+
+    def __lshift__(self, other):
+        return self.function(other)
+
+    def __rlshift__(self, other):
+        return Infix(lambda x, self=self, other=other: self.function(other, x))
+
+    def __and__(self, other):
+        return self.function(other)
+
+    def __rand__(self, other):
+        return Infix(lambda x, self=self, other=other: self.function(other, x))
+
+    def __or__(self, other):
+        return self.function(other)
+
+    def __ror__(self, other):
         return Infix(lambda x, self=self, other=other: self.function(other, x))
 
     def __call__(self, value1, value2):
@@ -42,10 +63,9 @@ r_leq = Infix(lambda x, y: x <= y)
 r_gt = Infix(lambda x, y: x > y)
 r_geq = Infix(lambda x, y: x >= y)
 # logical
+l_not = Infix(lambda x: not x)
 l_and = Infix(lambda x, y: x and y)
 l_or = Infix(lambda x, y: x or y)
-l_nand = Infix(lambda x, y: not (x and y))
-l_nor = Infix(lambda x, y: not (x or y))
 l_xor = Infix(lambda x, y: x != y)
 l_xnor = Infix(lambda x, y: x == y)
 
@@ -67,24 +87,20 @@ class VHDLproc:
 
     def _eval(self, statement: str, identifiers: Dict[str, str]):
 
-        statement = statement.lower()
+        logger.debug(f"Evaluating statement '{statement}'")
 
-        operators = (
-            "=",
-            "/=",
-            "<",
-            "<=",
-            ">",
-            ">=",
-            "and",
-            "or",
-            "nand",
-            "nor",
-            "xor",
-            "xnor",
-        )
+        # nand and nor aren't defined in the LRM for preprocessing
+        operators = ("=", "/=", "<", "<=", ">", ">=", "and", "or", "xor", "xnor", "not")
 
-        for name in statement.replace("(", " ").replace(")", " ").split(" "):
+        # Strings need to be compared case-sensitive, everything else is case-insensitive
+        for name in shlex.split(statement, posix=False):
+            if "'" not in name and '"' not in name:
+                statement = statement.replace(name, name.lower())
+
+        for name in shlex.split(statement, posix=False):
+            name = name.replace("(", " ").replace(")", " ")
+            if name in ["nand", "nor"]:
+                logger.error(f"{name} operator not supported for preprocessing")
             if (
                 name not in identifiers
                 and name not in operators
@@ -92,10 +108,9 @@ class VHDLproc:
                 and '"' not in name
             ):
                 logger.warning(f"Setting empty identifier {name}")
-                identifiers[name] = ""
+                identifiers[name.lower()] = ""
 
-        # replacing VHDL operators with Python ones to preserve VHDL
-        # operator precedence, / has higher precedence than |
+        # replacing VHDL operators with Python ones to preserve VHDL operator precedence
         statement = statement.replace(" = ", " /r_eq/ ")
         statement = statement.replace(" /= ", " /r_neq/ ")
         statement = statement.replace(" < ", " /r_lt/ ")
@@ -103,17 +118,17 @@ class VHDLproc:
         statement = statement.replace(" > ", " /r_gt/ ")
         statement = statement.replace(" >= ", " /r_geq/ ")
 
-        statement = statement.replace(" and ", " |l_and| ")
-        statement = statement.replace(" or ", " |l_or| ")
-        statement = statement.replace(" nand ", " |l_nand| ")
-        statement = statement.replace(" nor ", " |l_nor| ")
-        statement = statement.replace(" xor ", " |l_xor| ")
-        statement = statement.replace(" xnor ", " |l_xnor| ")
+        statement = statement.replace(" not ", " l_not** ")
+        statement = statement.replace(" and ", " +l_and+ ")
+        statement = statement.replace(" or ", " <<l_or>> ")
+        # xor and xnor have same precedence
+        statement = statement.replace(" xor ", " &l_xor& ")
+        statement = statement.replace(" xnor ", " &l_xnor& ")
 
         for id in identifiers:
-            locals()[id] = identifiers[id]
+            locals()[id.lower()] = identifiers[id]
 
-        logger.debug(f"Evaluating statement {statement}: {eval(statement)}")
+        logger.debug(f"Evaluating statement '{statement}': {eval(statement)}")
 
         return eval(statement)
 
@@ -174,9 +189,7 @@ class VHDLproc:
         if "TOOL_EDITION" not in identifiers:
             identifiers["TOOL_EDITION"] = ""
 
-        identifiers = {
-            key.lower(): value.lower() for (key, value) in identifiers.items()
-        }
+        identifiers = {key.lower(): value for (key, value) in identifiers.items()}
 
         ifstack = [[True, False]]
         line_i = -1
@@ -237,7 +250,7 @@ class VHDLproc:
                             raise Exception(
                                 f"Line {line_i+1}: `define directive requires a label and value"
                             )
-                        identifiers[directive[1].lower()] = directive[2].lower()[1:-1]
+                        identifiers[directive[1].lower()] = directive[2][1:-1]
 
                 if directive[0] == "`if":
                     if directive[-1] != "then":

@@ -65,3 +65,11 @@
 `else
 `error "Failed"
 `end
+
+`define a "this is four words"
+
+`if a = "this is four words" then
+`warning "Passed"
+`else
+`error "Failed"
+`end if
