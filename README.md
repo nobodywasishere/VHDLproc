@@ -74,7 +74,7 @@ ghdl -r --std=08 testbench    # run simulation
 Commented directives can also be parsed in-place, including replacing `include` directives:
 
 ```bash
-vhdlproc *.vhdl -e .vhdl --parse-comments # parse commented directives and overwrite original file
+vhdlproc *.vhdl --parse-comments # parse commented directives and overwrite original file
 ghdl -a --std=08 *.vhdl       # same exact files that were passed to ghdl
 ghdl -r --std=08 testbench    # run simulation
 ```
