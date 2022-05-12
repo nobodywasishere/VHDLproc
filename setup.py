@@ -1,10 +1,18 @@
 from setuptools import setup
 from vhdlproc import vhdlproc
 
+
+def readme():
+    with open("README.md") as f:
+        return f.read()
+
+
 setup(
     name="vhdlproc",
     version=vhdlproc.__version__,
     description="A simple VHDL preprocessor",
+    long_description=readme(),
+    long_description_content_type="text/markdown",
     url="https://github.com/nobodywasishere/vhdlproc",
     author="Margret Riegert",
     author_email="margret@eowyn.net",

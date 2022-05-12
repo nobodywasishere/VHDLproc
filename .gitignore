@@ -2,3 +2,4 @@ __pycache__
 dist
 vhdlproc.egg-info
 *.proc.vhdl
+build
