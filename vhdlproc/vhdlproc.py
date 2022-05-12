@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import os, sys
+import re
 import shlex
 import argparse
 import logging
@@ -8,7 +9,7 @@ from typing import Dict, List, Union
 
 logger = logging.getLogger(__name__)
 
-__version__ = "v2.2"
+__version__ = "v2.3"
 
 
 # Infix class based on https://code.activestate.com/recipes/384122/
@@ -85,9 +86,10 @@ class VHDLproc:
     ]
     _comment_char = "-- "
 
-    def _eval(self, statement: str, identifiers: Dict[str, str]):
+    def _eval(self, statement: str, identifiers: Dict[str, str]) -> bool:
 
         logger.debug(f"Evaluating statement '{statement}'")
+        # logger.debug(f"{identifiers=}")
 
         # nand and nor aren't defined in the LRM for preprocessing
         operators = ("=", "/=", "<", "<=", ">", ">=", "and", "or", "xor", "xnor", "not")
@@ -132,12 +134,15 @@ class VHDLproc:
 
         return eval(statement)
 
-    def parse_file(self, file: str, identifiers: Dict[str, str] = {}) -> str:
+    def parse_file(
+        self, file: str, identifiers: Dict[str, str] = {}, parse_comments: bool = False
+    ) -> str:
         """Reads and parses a file
 
         Args:
             file (str): Path to file to parse
             identifiers (Dict[str, str], optional): Identifiers to use. Defaults to {}.
+            parse_comments (bool): Parse commented directives as though they aren't commented
 
         Returns:
             str: Parsed code from file
@@ -148,13 +153,16 @@ class VHDLproc:
 
         include_path = "/".join(file.split("/")[:-1]) + "/"
 
-        return self.parse(code, identifiers, include_path=include_path)
+        return self.parse(
+            code, identifiers, include_path=include_path, parse_comments=parse_comments
+        )
 
     def parse(
         self,
         code: Union[List[str], str],
         identifiers: Dict[str, str] = {},
         include_path: str = "./",
+        parse_comments: bool = False,
     ) -> str:
         """Steps through each line of the code, finds, and executes preprocessing statements, commenting them out once finished
 
@@ -162,6 +170,7 @@ class VHDLproc:
             code (Union[List[str], str]): Source code as a string or list of strings split by line
             identifiers (Dict[str, str], optional): Identifiers. Defaults to {}.
             include_path (str, optional): Path to pull include files from. Defaults to "./".
+            parse_comments (bool): Parse commented directives as though they aren't commented
 
         Raises:
             Exception: Unknown directive
@@ -191,12 +200,22 @@ class VHDLproc:
 
         identifiers = {key.lower(): value for (key, value) in identifiers.items()}
 
-        ifstack = [[True, False]]
+        # if parsing comments, find directives commented once and remove the comment
+        if parse_comments:
+            for line_i in range(len(code)):
+                code[line_i] = re.sub(
+                    rf"^\s*{self._comment_char.strip()}\s*`", "`", code[line_i], count=1
+                )
+
         line_i = -1
+        ifstack = [[True, False]]
 
         while line_i < len(code) - 1:
             line_i = line_i + 1
+
             line = code[line_i].split("--")[0]  # ignore comments
+
+            # logging.debug(f"{line=}")
 
             if len(line.strip()) == 0:  # skip empty lines
                 continue
@@ -234,15 +253,29 @@ class VHDLproc:
                                 f"Line {line_i+1}: `error directive requires a message"
                             )
                         error_message = directive[1][1:-1]
-                        logger.error(f"Line {line_i+1}: Error: {error_message}")
+                        logger.error(f"Line {line_i+1}: {error_message}")
                         exit(1)
 
                     # open file and append source code at this location
                     elif directive[0] == "`include":
-                        filename = include_path + " ".join(directive[1:])[1:-1]
+                        filename = include_path + directive[1][1:-1]
                         include = []
                         for incl_line in open(filename):
                             include.append(incl_line.rstrip("\n"))
+                        include.append(f"`end include {directive[1]}")
+                        if parse_comments:
+                            # need to remove the old include, searches for corresponding `end include "file"
+                            incl_i = line_i
+                            while True:
+                                if incl_i > len(code):
+                                    raise Exception(
+                                        "Could not find corresponding `end include"
+                                    )
+                                elif f"`end include {directive[1]}" in code[incl_i]:
+                                    del code[line_i + 1 : incl_i + 1]
+                                    break
+                                else:
+                                    incl_i += 1
                         code = code[: line_i + 1] + include + code[line_i + 1 :]
 
                     elif directive[0] == "`define":
@@ -277,7 +310,10 @@ class VHDLproc:
                         ifstack[-1][0] = not ifstack[-1][1]
 
                 elif directive[0] == "`end":
-                    ifstack.pop()
+                    if len(directive) > 1 and directive[1] == "include":
+                        continue
+                    else:
+                        ifstack.pop()
 
             # don't comment out lines that are already commented out
             if not ifstack[-1][0] and code[line_i].strip()[:2] != "--":
@@ -321,7 +357,7 @@ def test_file(name: str, identifiers: Dict[str, str] = {}) -> bool:
     return passed
 
 
-def test_all(identifiers: Dict[str, str]):
+def test_all(identifiers: Dict[str, str]) -> bool:
     """Runs the 'include', 'and', and 'nest' tests
 
     Returns:
@@ -334,7 +370,7 @@ def test_all(identifiers: Dict[str, str]):
     )
 
 
-def _cli():
+def _cli() -> None:
     parser = argparse.ArgumentParser(
         description=f"VHDLproc {__version__} - VHDL Preprocessor"
     )
@@ -359,6 +395,11 @@ def _cli():
         metavar="EXTENSION",
         default=".proc.vhdl",
         help="Output extension for processed files (defaults to '.proc.vhdl')",
+    )
+    parser.add_argument(
+        "--parse-comments",
+        action="store_true",
+        help="Parse commented directives as though they aren't commented, overwrite original file. Disables skipping based on file extension",
     )
     parser.add_argument(
         "--self-test",
@@ -386,7 +427,7 @@ def _cli():
 
     proc = VHDLproc()
     for file in args.input:
-        if file.endswith(args.e):
+        if file.endswith(args.e) and not args.parse_comments:
             logging.debug(f"Skipping file {file}")
             continue
 
@@ -398,6 +439,8 @@ def _cli():
                 args.o,
                 os.path.splitext(os.path.basename(file))[0] + args.e,
             )
+        elif args.parse_comments:
+            newfile = file
         else:
             newfile = os.path.splitext(file)[0] + args.e
 
@@ -405,7 +448,9 @@ def _cli():
 
         logging.debug(f"Parsing file {file} to {newfile}")
 
-        parsed_code = proc.parse_file(file, identifiers=identifiers)
+        parsed_code = proc.parse_file(
+            file, identifiers=identifiers, parse_comments=args.parse_comments
+        )
         with open(newfile, "w") as f:
             f.write(parsed_code)
 

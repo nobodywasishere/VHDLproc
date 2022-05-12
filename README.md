@@ -30,11 +30,11 @@ $ ./vhdlproc/vhdlproc.py --help
 ### Command Line
 
 ```
-usage: vhdlproc.py [-h] [-D IDENTIFIER=value] [-o DIRECTORY] [-e EXTENSION] [--self-test]
-                   [--log-level LEVEL]
+usage: vhdlproc.py [-h] [-D IDENTIFIER=value] [-o DIRECTORY] [-e EXTENSION] [--parse-comments]
+                   [--self-test] [--log-level LEVEL]
                    [input ...]
 
-VHDLproc v2.2 - VHDL Preprocessor
+VHDLproc v2.3 - VHDL Preprocessor
 
 positional arguments:
   input                Input files (will skip over files with the output extension)
@@ -44,6 +44,8 @@ options:
   -D IDENTIFIER=value  Specify identifiers for conditional compilation, ex. DEBUG_LEVEL=2
   -o DIRECTORY         Directory to store parsed files
   -e EXTENSION         Output extension for processed files (defaults to '.proc.vhdl')
+  --parse-comments     Parse commented directives as though they aren't commented, overwrite original
+                       file. Disables skipping based on file extension
   --self-test          Run a self-test to ensure functionality
   --log-level LEVEL    Configure the logging level
 ```
@@ -66,6 +68,14 @@ The parsed files can also be stored to another directory:
 ```bash
 vhdlproc *.vhdl -o build/     # preprocess all the files and store in build/
 ghdl -a --std=08 build/*.vhdl # pass processed files in build/ to ghdl
+ghdl -r --std=08 testbench    # run simulation
+```
+
+Commented directives can also be parsed in-place, including replacing `include` directives:
+
+```bash
+vhdlproc *.vhdl -e .vhdl --parse-comments # parse commented directives and overwrite original file
+ghdl -a --std=08 *.vhdl       # same exact files that were passed to ghdl
 ghdl -r --std=08 testbench    # run simulation
 ```
 
@@ -130,18 +140,22 @@ parsed_text = processor.parse(code, identifiers=identifiers, include_path="path/
 
 `end [if]
 
-`warning "STRING"       -   Print STRING to standard error output stream
+`warning "STRING"       --   Print STRING to standard error output stream
 
-`error "STRING"         -   Print STRING to standard error output stream
-                            Will force close VHDLproc without saving
+`error "STRING"         --   Print STRING to standard error output stream
+                        --   Will force close VHDLproc without saving
 
 -- Additional extensions not part of VHDL-2019
 
-`define LABEL "STRING"  -   Gives LABEL the value of STRING for
-                            conditional statements
+`define LABEL "STRING"  --   Gives LABEL the value of STRING for
+                        --   conditional statements
 
-`include "FILENAME"     -   Include another file relative to
-                            the location of the source
+`include "FILENAME"     --   Include another file relative to
+                        --   the location of the source
+
+`end include "FILENAME" --   This is a counterpart to `include for parsing commented directives
+                        --   in-place, should not be used directly (added automatically)
+                        --   Sets the bound of where to replace when re-including a file
 ```
 
 ### Identifiers (or Labels)
@@ -154,6 +168,8 @@ By default, `TOOL_NAME` is set to `VHDLproc` and `TOOL_VERSION` is set to the cu
 - [ ] Prevent a file from including itself (to prevent infinite loops)
 - [ ] Modify text and file operations to work on Windows (if they don't already)
 - [ ] Throw an error if a `` `warning `` or `` `error `` string isn't wrapped in quotes
+- [x] Parse comments / files in-place
+- [x] Fix precedence of operators
 - [x] Add the option to the CLI to take in a series of file inputs, process them, save the individual results to temporary files (i.e. in `/tmp/` or a local path), then return all of the filepaths. This would be useful for doing this with GHDL: `ghdl -a $(vhdlproc *.vhdl)`. 
 
 ## Examples
@@ -191,6 +207,7 @@ component pll is
         clk_locked : out std_logic
     );
 end component;
+-- `end include "include-to.vhdl"
 ```
 
 ### Define, Repeated If/Elsif
@@ -282,5 +299,106 @@ constant enable_features : bool := true
 -- `else
 -- `warning "Certain features disabled!"
 -- constant enable_features : bool := false
+-- `end
+```
+
+### Parsing Comments
+
+With the flag `--parse-comments`, directives are executed in-place as if they weren't commented. Code added by an `include` directive is replaced with an updated version, bounded by a corresponding `end include`.
+
+Input:
+```vhdl
+-- `warning "== Including file =="
+-- `define Include_file "TRUE"
+
+-- `if INCLUDE_FILE = "TRUE" then
+-- `include "../tests/include-to.vhdl"
+component OLD_CODE is
+  port(
+	  a : in unsigned(3 downto 0);
+	  b : in unsigned(3 downto 0);
+	  s : in std_logic_vector(1 downto 0);
+	  y : out unsigned(3 downto 0)
+  );
+end component;
+-- `end include "../tests/include-to.vhdl"
+-- `else
+-- `error "Not including thing"
+-- `end if
+
+-- `warning "== Not including file =="
+-- `define Include_file "false"
+-- `define passed ""
+
+-- `if INCLUDE_FILE = "TRUE" then
+-- `include "../tests/include-to.vhdl"
+-- `else
+-- `end if
+
+-- `if passed /= "" then
+-- `Warning "Failed"
+-- `else
+-- `Warning "Passed"
+-- `end
+```
+
+include-to.vhdl:
+
+```vhdl
+component pll is
+    port (
+        clk_in : in std_logic;
+        clk_out : out std_logic;
+        clk_locked : out std_logic
+    );
+end component;
+`if include_file = "false" then
+`error "Failed"
+`else
+`warning "Passed"
+`end
+
+`define passed "failed"
+```
+
+Output:
+```vhdl
+-- `warning "== Including file =="
+-- `define Include_file "TRUE"
+
+-- `if INCLUDE_FILE = "TRUE" then
+-- `include "../tests/include-to.vhdl"
+component pll is
+    port (
+        clk_in : in std_logic;
+        clk_out : out std_logic;
+        clk_locked : out std_logic
+    );
+end component;
+-- `if include_file = "false" then
+-- `error "Failed"
+-- `else
+-- `warning "Passed"
+-- `end
+
+-- `define passed "failed"
+-- `end include "../tests/include-to.vhdl"
+-- `else
+-- `error "Not including thing"
+-- `end if
+
+-- `warning "== Not including file =="
+-- `define Include_file "false"
+-- `define passed ""
+
+-- `if INCLUDE_FILE = "TRUE" then
+-- `include "../tests/include-to.vhdl"
+-- `else
+-- `end if
+
+-- `if passed /= "" then
+-- `Warning "Failed"
+-- `else
+-- `Warning "Passed"
 -- `end
 ```
