@@ -4,9 +4,7 @@ import os, sys
 import shlex
 import argparse
 import logging
-
-# from vhdlproc_infix import *
-# import vhdlproc_test
+from typing import Dict, List, Union
 
 logger = logging.getLogger(__name__)
 
@@ -47,16 +45,12 @@ l_xnor = Infix(lambda x,y:      x  == y)
 
 
 class VHDLproc:
-    __tool_name    = "VHDLproc"
-    __version      = __version__
-    __directives   = ['`warning', '`error', '`if', '`elsif', '`else', '`end', '`include', '`define']
-    __comment_char = "-- "
+    _tool_name    = "VHDLproc"
+    _version      = __version__
+    _directives   = ['`warning', '`error', '`if', '`elsif', '`else', '`end', '`include', '`define']
+    _comment_char = "-- "
 
-    def __eval(self, statement, identifiers):
-
-        statement = ' '.join(statement)
-
-        # print(f'VHDLproc: Evaluating statement {statement}')
+    def _eval(self, statement: str, identifiers: Dict[str, str]):
 
         statement = statement.lower()
 
@@ -65,7 +59,7 @@ class VHDLproc:
 
         for name in statement.replace('(', ' ').replace(')', ' ').split(' '):
             if name not in identifiers and name not in operators and "'" not in name and '"' not in name:
-                logger.warning(f'VHDLproc: Warning: Setting empty identifier {name}')
+                logger.warning(f'Setting empty identifier {name}')
                 identifiers[name] = ""
                 
 
@@ -88,25 +82,53 @@ class VHDLproc:
         for id in identifiers:
             locals()[id] = identifiers[id]
 
-        # print(f'Evaluating statement {statement}: {eval(statement)}')
+        logger.debug(f'Evaluating statement {statement}: {eval(statement)}')
 
         return eval(statement)
 
-    def parse_file(self, file, identifiers={}):
-        code = []
-        for line in open(file):
-            code.append(line.rstrip('\n'))
+    def parse_file(self, file: str, identifiers: Dict[str, str] = {}) -> str:
+        """Reads and parses a file
+
+        Args:
+            file (str): Path to file to parse
+            identifiers (Dict[str, str], optional): Identifiers to use. Defaults to {}.
+
+        Returns:
+            str: Parsed code from file
+        """
+
+        with open(file) as f:
+            code = f.read().splitlines()
 
         include_path = '/'.join(file.split('/')[:-1]) + '/'
         
         return self.parse(code, identifiers, include_path=include_path)
 
-    def parse(self, code, identifiers={}, include_path="./"):
+    def parse(self, code: Union[List[str], str], identifiers: Dict[str, str] = {}, include_path: str = "./") -> str:
+        """Steps through each line of the code, finds, and executes preprocessing statements, commenting them out once finished
+
+        Args:
+            code (Union[List[str], str]): Source code as a string or list of strings split by line
+            identifiers (Dict[str, str], optional): Identifiers. Defaults to {}.
+            include_path (str, optional): Path to pull include files from. Defaults to "./".
+
+        Raises:
+            Exception: Unknown directive
+            Exception: `warning directive requires a message
+            Exception: `error directive requires a message
+            Exception: `define directive requires a label and value
+            Exception: `if directive requires a then
+            Exception: `elsif directive requires a then
+            Exception: Missing `end [ if ]
+
+        Returns:
+            str: Parsed code
+        """
         if isinstance(code, str):
             code = code.splitlines()
 
-        identifiers['TOOL_NAME']    = self.__tool_name
-        identifiers['TOOL_VERSION'] = self.__version
+        identifiers['TOOL_NAME']    = self._tool_name
+        identifiers['TOOL_VERSION'] = self._version
         if 'VHDL_VERSION' not in identifiers:
             identifiers['VHDL_VERSION'] = ""
         if 'TOOL_TYPE' not in identifiers:
@@ -116,12 +138,7 @@ class VHDLproc:
         if 'TOOL_EDITION' not in identifiers:
             identifiers['TOOL_EDITION'] = ""
 
-        temp_ids = {}
-
-        for id in identifiers:
-            temp_ids[id.lower()] = identifiers[id].lower()
-
-        identifiers = temp_ids
+        identifiers = {key.lower():value.lower() for (key,value) in identifiers.items()}
 
         ifstack = [[True, False]]
         line_i = -1
@@ -129,8 +146,6 @@ class VHDLproc:
         while line_i < len(code) - 1:
             line_i = line_i + 1
             line = code[line_i].split('--')[0] # ignore comments
-
-            # print(f'\nline:    {line}')
 
             if len(line.strip()) == 0: # skip empty lines
                 continue
@@ -141,28 +156,28 @@ class VHDLproc:
                 # remove blank space and split words into a list
                 # don't separate quotes
                 directive = shlex.split(line.strip(), posix=False)
-                code[line_i] = self.__comment_char + code[line_i]
+                code[line_i] = self._comment_char + code[line_i]
 
                 directive[0] = directive[0].lower()
 
                 if ifstack[-1][0]:
                     # if it's not a supported directive
-                    if directive[0] not in self.__directives:
-                        raise Exception(f"VHDLproc: Line {line_i+1}: Unknown directive: {line.strip().split(' ')[0]}")
+                    if directive[0] not in self._directives:
+                        raise Exception(f"Line {line_i+1}: Unknown directive: {line.strip().split(' ')[0]}")
 
                     # print warning messages if not commented out
                     elif directive[0] == '`warning':
                         if len(directive) < 2:
-                            raise Exception(f'VHDLproc: Line {line_i+1}: `warning directive requires a message')
+                            raise Exception(f'Line {line_i+1}: `warning directive requires a message')
                         warning_message = directive[1][1:-1]
-                        logger.warning(f'VHDLproc: Warning: Line {line_i+1}: {warning_message}')
+                        logger.warning(f'Line {line_i+1}: {warning_message}')
 
                     # print error messages if not commented out
                     elif directive[0] == '`error':
                         if len(directive) < 2:
-                            raise Exception(f'VHDLproc: Line {line_i+1}: `error directive requires a message')
+                            raise Exception(f'Line {line_i+1}: `error directive requires a message')
                         error_message = directive[1][1:-1]
-                        logger.error(f'VHDLproc: Line {line_i+1}: Error: {error_message}')
+                        logger.error(f'Line {line_i+1}: Error: {error_message}')
                         exit(1)
 
                     # open file and append source code at this location
@@ -175,22 +190,22 @@ class VHDLproc:
 
                     elif directive[0] == '`define':
                         if len(directive) != 3:
-                            raise Exception(f'VHDLproc: Line {line_i+1}: `error directive requires a label and value')
+                            raise Exception(f'Line {line_i+1}: `define directive requires a label and value')
                         identifiers[directive[1].lower()] = directive[2].lower()[1:-1]
 
                 if directive[0] == '`if':
                     if directive[-1] != "then":
-                        raise Exception(f'VHDLproc: Line {line_i+1}: `if directive requires a then')
+                        raise Exception(f'Line {line_i+1}: `if directive requires a then')
                     if ifstack[-1][0]:
-                        resp = self.__eval(directive[1:-1], identifiers)
+                        resp = self._eval(' '.join(directive[1:-1]), identifiers)
                         ifstack.append([resp, resp])
                     else:
                         ifstack.append([False, True])
 
                 elif directive[0] == '`elsif':
                     if directive[-1] != "then":
-                        raise Exception(f'VHDLproc: Line {line_i+1}: `elsif directive requires a then')
-                    resp = self.__eval(directive[1:-1], identifiers)
+                        raise Exception(f'Line {line_i+1}: `elsif directive requires a then')
+                    resp = self._eval(' '.join(directive[1:-1]), identifiers)
                     ifstack[-1][0] = not ifstack[-1][1] and resp
                     ifstack[-1][1] = ifstack[-1][1] or resp
 
@@ -203,46 +218,63 @@ class VHDLproc:
 
             # don't comment out lines that are already commented out
             if not ifstack[-1][0] and code[line_i].strip()[:2] != "--":
-                code[line_i] = self.__comment_char + code[line_i]
+                code[line_i] = self._comment_char + code[line_i]
 
             # print(f'ifstack: {ifstack}')
 
         if len(ifstack) > 1:
-            raise Exception(f"VHDLproc: Line {line_i+1}: Missing `end [ if ]")
+            raise Exception(f"Line {line_i+1}: Missing `end [ if ]")
 
         return '\n'.join(code)
 
-def test_file(name, identifiers={}):
+def test_file(name: str, identifiers: Dict[str,str] = {}) -> bool:
+    """Runs a built-in test to verify functionality
+
+    Args:
+        name (str): Name of the test
+        identifiers (Dict[str,str], optional): Identifiers to pass into the files. Defaults to {}.
+
+    Returns:
+        bool: Whether the test passed or failed
+    """
     print(f'\n== Testing {name} ==')
     proc = VHDLproc()
     filename = os.path.dirname(__file__) + f'/tests/{name}.vhdl'
     passed = True
 
     try:
-        parsed = proc.parse_file(filename, identifiers=identifiers)
+        proc.parse_file(filename, identifiers=identifiers)
     except Exception as e:
-        print(e)
-        print("Failed")
+        logging.error(e)
+        logging.error("Test Failed")
         passed = passed and False
 
     if passed:
-        print('== Passed ==')
+        logging.info('== Passed ==')
     else:
-        print('== Failed ==')
+        logging.info('== Failed ==')
 
     return passed
 
 
 def test_all():
+    """Runs the 'include', 'and', and 'nest' tests
+
+    Returns:
+        bool: Whether the tests passed or failed
+    """
     return not (test_file('include') and test_file('and') and test_file('nest'))
 
-def cli():
+def _cli():
     parser = argparse.ArgumentParser(description=f"VHDLproc v{__version__} - VHDL Preprocessor")
     parser.add_argument('-i', help='Input file (Omit to read from stdin)')
     parser.add_argument('-o', help='Output file (Omit to print to stdout)')
     parser.add_argument('--test', action='store_true', help='Tests VHDLproc to ensure functionality')
     parser.add_argument('-D', action="append", metavar="IDENTIFIER=value", help='Specify identifiers for conditional compilation, ex. DEBUG_LEVEL=2')
+    parser.add_argument("--log-level", default=logging.INFO, type=(lambda x: getattr(logging, x)), help = "Configure the logging level.")
     args = parser.parse_args()
+
+    logging.basicConfig(level=args.log_level, format="%(levelname)s: %(message)s")
 
     if args.test:
         retn = test_all()
@@ -271,4 +303,4 @@ def cli():
         print(parsed_code)
 
 if __name__ == "__main__":
-    cli()
+    _cli()
